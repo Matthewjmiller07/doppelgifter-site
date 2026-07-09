@@ -379,16 +379,7 @@
             <button class="btn" id="gateBtn" style="padding:10px 18px;">Unlock the atelier →</button>
           </div>
         </div>
-        <div class="ledger">
-          <h3>The Founder's Ledger (you don't see this, but your accountant will)</h3>
-          <table>
-            <tr><td>Customer pays (item + shipping)</td><td id="lRev">$29.98</td></tr>
-            <tr><td>Print + fulfillment (Printify)</td><td id="lCogs">−$10.13</td></tr>
-            <tr><td>AI portrait render</td><td>−$0.04</td></tr>
-            <tr><td>Stripe's cut</td><td id="lStripe">−$1.17</td></tr>
-            <tr class="total"><td>Your profit per idiot immortalized</td><td id="lProfit">$18.64</td></tr>
-          </table>
-        </div>
+        
         <button class="btn finebtn" id="payBtn">Pay & immortalize — <span id="payPrice">$29.98</span></button>
         <p class="hint" id="paidNote" style="display:none;">🎉 This is the prototype — no card was harmed. In production this is Stripe Checkout → webhook → Printify order. You sleep; the mug ships.</p>
       </div>
@@ -510,10 +501,6 @@
     var stripe = rev * 0.029 + 0.30;
     var profit = rev - cogs - 0.04 - stripe;
     var fmt = function (n) { return "$" + n.toFixed(2); };
-    document.getElementById("lRev").textContent = fmt(rev);
-    document.getElementById("lCogs").textContent = "−" + fmt(cogs);
-    document.getElementById("lStripe").textContent = "−" + fmt(stripe);
-    document.getElementById("lProfit").textContent = fmt(profit);
     document.getElementById("payPrice").textContent = fmt(rev);
     liveRender();
   }
