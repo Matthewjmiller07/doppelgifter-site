@@ -610,10 +610,14 @@
     btn.textContent = "Waiting for the atelier to finish…";
     ensureArt().then(function (art) {
       btn.textContent = "Opening the treasury…";
+      var mock = mockCache[GIFT_KEYS[state.gift]] || null;
+      try {
+        localStorage.dgLastOrder = JSON.stringify({ img: mock || art, gift: state.gift, style: state.style });
+      } catch (err) {}
       return fetch(CONFIG.url + "/functions/v1/dg-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
-        body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: art, email: dgEmail() })
+        body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: art, preview_url: mock, email: dgEmail() })
       }).then(function (res) { return res.json(); }).then(function (d) {
         if (d.url) { location.href = d.url; return; }
         throw new Error(d.error || "checkout failed");
@@ -638,8 +642,17 @@
   show(0);
   if (location.search.indexOf("order=success") !== -1) {
     document.querySelector("#s0 h1").innerHTML = "Huzzah!<br>It is done.";
-    document.querySelector("#s0 .lede").innerHTML = "Payment received. The atelier is preparing the masterpiece and a shipping confirmation will land in your inbox. <em>They suspect nothing.</em>";
+    document.querySelector("#s0 .lede").innerHTML = "Payment received. This is what the masters are producing — a confirmation email is on its way to your inbox. <em>They suspect nothing.</em>";
     document.querySelector("#s0 .btn").innerHTML = "Immortalize another friend →";
+    try {
+      var lo = JSON.parse(localStorage.dgLastOrder || "null");
+      if (lo && lo.img) {
+        var heroImg = document.querySelector("#heroArt img");
+        heroImg.src = lo.img;
+        heroImg.alt = "Your commissioned piece";
+        document.querySelector("#heroArt .plaque").textContent = lo.gift + " — " + lo.style;
+      }
+    } catch (e) {}
   } else if (location.search.indexOf("order=cancelled") !== -1) {
     document.querySelector("#s0 .lede").innerHTML = "Checkout abandoned. <em>Cold feet? They deserve immortality. The mug waits.</em>";
   }
