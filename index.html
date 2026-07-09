@@ -372,6 +372,13 @@
         <p class="lede" style="margin-bottom: 8px;" id="summaryLine">One <b>Ceremonial Mug</b>, bearing their likeness in the style of <b>The Renaissance Noble</b>.</p>
         <p class="okline">Final 300-DPI render happens only after payment clears — previews cost us pennies, masterpieces cost us slightly more pennies.</p>
         <p class="okline" id="renderStatus" style="display:none; font-weight:600;"></p>
+        <div id="emailGate" style="display:none; margin-top:14px;">
+          <p class="okline" style="margin:0 0 8px;"><b>The first masterpiece was on the house.</b> Leave your email and the atelier keeps painting — plus the occasional dangerously good gift idea in your inbox.</p>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <input id="gateEmail" type="email" placeholder="you@example.com" autocomplete="email" style="flex:1 1 200px; padding:10px 12px; border:1px solid var(--line); border-radius:4px; background:var(--ground-raise); color:var(--ink); font-family:inherit; font-size:15px;">
+            <button class="btn" id="gateBtn" style="padding:10px 18px;">Unlock the atelier →</button>
+          </div>
+        </div>
         <div class="ledger">
           <h3>The Founder's Ledger (you don't see this, but your accountant will)</h3>
           <table>
@@ -522,15 +529,23 @@
   var GIFT_KEYS = { "The Ceremonial Mug": "mug", "The Monument Tee": "tee", "The Heirloom Blanket": "blanket", "The Gallery Poster": "poster" };
   var artPromise = null, artStyle = null, mockCache = {}, lastArt = null;
 
+  function dgEmail() {
+    try { return localStorage.dgEmail || null; } catch (e) { return null; }
+  }
   function dgRender(body) {
     body.session_key = SKEY;
+    if (dgEmail()) body.email = dgEmail();
     return fetch(CONFIG.url + "/functions/v1/dg-render", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
       body: JSON.stringify(body)
     }).then(function (res) {
       return res.json().then(function (d) {
-        if (!res.ok) throw new Error(d.error || ("HTTP " + res.status));
+        if (!res.ok) {
+          var err = new Error(d.error || ("HTTP " + res.status));
+          err.code = res.status;
+          throw err;
+        }
         return d;
       });
     });
@@ -567,10 +582,25 @@
         status.textContent = "✓ Rendered live from your photo. Cost to the house: about 3¢.";
       });
     }).catch(function (e) {
-      status.textContent = "😔 The atelier hiccuped: " + e.message;
       artPromise = null;
+      if (e.code === 402) {
+        status.textContent = "🖌️ The atelier paused mid-brushstroke…";
+        document.getElementById("emailGate").style.display = "block";
+        return;
+      }
+      status.textContent = "😔 The atelier hiccuped: " + e.message;
     });
   }
+  document.getElementById("gateBtn").addEventListener("click", function () {
+    var v = document.getElementById("gateEmail").value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) {
+      document.getElementById("gateEmail").style.borderColor = "var(--seal)";
+      return;
+    }
+    try { localStorage.dgEmail = v.toLowerCase(); } catch (err) {}
+    document.getElementById("emailGate").style.display = "none";
+    liveRender();
+  });
 
   document.getElementById("payBtn").addEventListener("click", function () {
     var btn = this;
@@ -584,7 +614,7 @@
     fetch(CONFIG.url + "/functions/v1/dg-checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
-      body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: lastArt })
+      body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: lastArt, email: dgEmail() })
     }).then(function (res) { return res.json(); }).then(function (d) {
       if (d.url) { location.href = d.url; return; }
       throw new Error(d.error || "checkout failed");
