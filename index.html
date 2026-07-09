@@ -614,7 +614,7 @@
       return;
     }
     document.getElementById("prev4Img").src = lastArt || state.photo;
-    veil("veilPrev4", "🏺 Pressing… ~25s");
+    veil("veilPrev4", "🏺 Pressing… ~10s");
     ensureMock(giftKey).then(function (m) {
       document.getElementById("prev4Img").src = m;
       veil("veilPrev4", false);
@@ -808,7 +808,7 @@
     return ensureArt().then(function (art) {
       if (mockCache[giftKey]) return mockCache[giftKey];
       if (!mockPromises[giftKey]) {
-        atelierStart("🏺 Pressing onto the goods", 28);
+        atelierStart("🏺 Pressing onto the goods", 10);
         mockPromises[giftKey] = dgRender({ art_url: art, products: [giftKey] }).then(function (d) {
           mockCache[giftKey] = d.mockups[giftKey];
           atelierDone("✓ Preview ready");
@@ -857,10 +857,10 @@
         status.textContent = "✓ Rendered live from your photo.";
         return;
       }
-      status.textContent = "🏺 Pressing it onto the merchandise… (~25 seconds)";
+      status.textContent = "🏺 Pressing it onto the real merchandise… (~10 seconds)";
       document.getElementById("summaryArt2").style.display = "block";
       document.getElementById("mockupImg").src = art;
-      veil("veilMock", "🏺 Pressing onto " + state.gift.replace("The ", "the ") + "… ~25s");
+      veil("veilMock", "🏺 Pressing onto " + state.gift.replace("The ", "the ") + "… ~10s");
       return ensureMock(giftKey).then(function (m) {
         showMock(m);
         veil("veilMock", false);
