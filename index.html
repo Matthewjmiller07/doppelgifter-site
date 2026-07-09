@@ -1,6 +1,9 @@
-<!-- Meta Pixel: when the ad account exists, paste the pixel base code here
-     (Meta Events Manager → your pixel → Install manually). The site already
-     fires fbq("track", "Purchase") on the order-success page once fbq exists. -->
+<!-- Ad pixels: paste each platform's base code here when the account exists.
+     The site already fires the conversion events once the pixel object exists:
+       Meta   → fbq("track", "Purchase")
+       TikTok → ttq.track("CompletePayment") and ttq.track("InitiateCheckout")
+     Meta pixel: Events Manager → Install manually.
+     TikTok pixel: TikTok Ads Manager → Assets → Events → Web Events → Manual install. -->
 <title>DoppelGifter — Their face. On stuff.</title>
 <style>
   :root {
@@ -910,6 +913,9 @@
   document.getElementById("payBtn").addEventListener("click", function () {
     var btn = this;
     var note = document.getElementById("paidNote");
+    if (typeof ttq === "object" && ttq && typeof ttq.track === "function") {
+      try { ttq.track("InitiateCheckout", { currency: "USD", value: state.price + 4.99 }); } catch (e) {}
+    }
     if (!state.photo) {
       btn.disabled = true;
       btn.textContent = "Opening the treasury…";
@@ -980,8 +986,12 @@
       var lo = JSON.parse(localStorage.dgLastOrder || "null");
       if (lo && lo.img) applyOrder(lo.img, lo.gift + " — " + lo.style);
     } catch (e) {}
+    var orderValue = state.price + 4.99;
     if (typeof fbq === "function") {
-      try { fbq("track", "Purchase", { currency: "USD", value: state.price + 4.99 }); } catch (e) {}
+      try { fbq("track", "Purchase", { currency: "USD", value: orderValue }); } catch (e) {}
+    }
+    if (typeof ttq === "object" && ttq && typeof ttq.track === "function") {
+      try { ttq.track("CompletePayment", { currency: "USD", value: orderValue }); } catch (e) {}
     }
     var sid = new URLSearchParams(location.search).get("sid");
     if (sid) {
