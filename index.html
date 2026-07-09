@@ -514,9 +514,15 @@
     state.style = c.dataset.style;
     var img = c.querySelector("img");
     state.styleImg = img ? img.src : null;
-    if (!state.photo) return;
     var box = document.getElementById("livePrev3");
     box.style.display = "block";
+    if (!state.photo) {
+      document.getElementById("prev3Img").src = state.styleImg;
+      veil("veilPrev3", false);
+      box.querySelector(".plaque").textContent = "Demo — our sample gentleman";
+      return;
+    }
+    box.querySelector(".plaque").textContent = "Your version — live";
     if (lastArt && artStyle === STYLE_KEYS[state.style]) {
       document.getElementById("prev3Img").src = lastArt;
       veil("veilPrev3", false);
@@ -534,10 +540,16 @@
   wireGrid("giftGrid", "giftNext", function (c) {
     state.gift = c.dataset.gift;
     state.price = parseFloat(c.dataset.price);
-    if (!state.photo) return;
     var box = document.getElementById("livePrev4");
     var giftKey = GIFT_KEYS[state.gift];
     box.style.display = "block";
+    if (!state.photo) {
+      document.getElementById("prev4Img").src = DEMO_MOCKS[giftKey];
+      veil("veilPrev4", false);
+      box.querySelector(".plaque").textContent = "Demo — " + state.gift;
+      return;
+    }
+    box.querySelector(".plaque").textContent = "On the goods — live";
     if (mockCache[giftKey]) {
       document.getElementById("prev4Img").src = mockCache[giftKey];
       veil("veilPrev4", false);
@@ -580,6 +592,9 @@
   var STYLE_KEYS = { "The Renaissance Noble": "renaissance", "The Saturday Cartoon": "cartoon", "The '85 Glamour Shot": "glamour", "The Marble Bust": "marble" };
   var GIFT_KEYS = { "The Ceremonial Mug": "mug", "The Monument Tee": "tee", "The Heirloom Blanket": "blanket", "The Gallery Poster": "poster" };
   var artPromise = null, artStyle = null, mockCache = {}, mockPromises = {}, lastArt = null;
+  var DEMO_MOCKS = { mug: "demo/mug.jpg", tee: "demo/tee.jpg", poster: "demo/poster.jpg", blanket: "demo/blanket.jpg" };
+  var DEMO_ART = "demo/renaissance-art.png";
+  function absUrl(p) { return new URL(p, location.href).href; }
 
   function dgEmail() {
     try { return localStorage.dgEmail || null; } catch (e) { return null; }
@@ -646,8 +661,16 @@
   }
 
   function liveRender() {
-    if (!state.photo) return;
     var status = document.getElementById("renderStatus");
+    if (!state.photo) {
+      if (state.styleImg) document.getElementById("summaryImg").src = state.styleImg;
+      document.getElementById("summaryArt2").style.display = "block";
+      document.getElementById("mockupImg").src = DEMO_MOCKS[GIFT_KEYS[state.gift]];
+      veil("veilMock", false);
+      status.style.display = "block";
+      status.textContent = "🧪 Demo mode — our sample gentleman stands in. Upload a photo on step 1 for the real thing.";
+      return;
+    }
     status.style.display = "block";
     var giftKey = GIFT_KEYS[state.gift];
     if (!lastArt) {
@@ -699,8 +722,25 @@
     var btn = this;
     var note = document.getElementById("paidNote");
     if (!state.photo) {
-      note.style.display = "block";
-      note.textContent = "Demo mode: upload a photo on step 1 to unlock real checkout.";
+      btn.disabled = true;
+      btn.textContent = "Opening the treasury…";
+      var demoGift = GIFT_KEYS[state.gift];
+      try {
+        localStorage.dgLastOrder = JSON.stringify({ img: DEMO_MOCKS[demoGift], gift: state.gift, style: state.style + " (demo)" });
+      } catch (err) {}
+      fetch(CONFIG.url + "/functions/v1/dg-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
+        body: JSON.stringify({ style: state.style + " (demo)", product: demoGift, art_url: absUrl(DEMO_ART), preview_url: absUrl(DEMO_MOCKS[demoGift]), email: dgEmail() })
+      }).then(function (res) { return res.json(); }).then(function (d) {
+        if (d.url) { location.href = d.url; return; }
+        throw new Error(d.error || "checkout failed");
+      }).catch(function (e) {
+        btn.disabled = false;
+        btn.textContent = "Pay & immortalize — retry";
+        note.style.display = "block";
+        note.textContent = "The treasury hiccuped: " + e.message;
+      });
       return;
     }
     btn.disabled = true;
