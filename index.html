@@ -333,6 +333,11 @@
         <span class="cdesc">For friends who peaked in antiquity.</span>
       </button>
     </div>
+    <div id="livePrev3" style="display:none; margin-top:24px; max-width:230px; position:relative;">
+      <img class="framed" id="prev3Img" alt="Your live render" style="aspect-ratio:1/1; object-fit:cover;">
+      <div class="veil" id="veilPrev3"><div class="ring"></div><div class="veilText">Painting…</div></div>
+      <span class="plaque">Your version — live</span>
+    </div>
     <div class="actions">
       <button class="btn" data-next id="styleNext" disabled>Render their legacy →</button>
     </div>
@@ -366,6 +371,11 @@
         <span class="cname">The Gallery Poster <span class="price">$34.99</span></span>
         <span class="cdesc">18×24", museum matte. Hang it where guests must confront it.</span>
       </button>
+    </div>
+    <div id="livePrev4" style="display:none; margin-top:24px; max-width:230px; position:relative;">
+      <img class="framed" id="prev4Img" alt="Live product mockup" style="aspect-ratio:1/1; object-fit:cover;">
+      <div class="veil" id="veilPrev4"><div class="ring"></div><div class="veilText">Pressing…</div></div>
+      <span class="plaque">On the goods — live</span>
     </div>
     <div class="actions">
       <button class="btn" data-next id="giftNext" disabled>To the treasury →</button>
@@ -504,11 +514,43 @@
     state.style = c.dataset.style;
     var img = c.querySelector("img");
     state.styleImg = img ? img.src : null;
-    if (state.photo) ensureArt();
+    if (!state.photo) return;
+    var box = document.getElementById("livePrev3");
+    box.style.display = "block";
+    if (lastArt && artStyle === STYLE_KEYS[state.style]) {
+      document.getElementById("prev3Img").src = lastArt;
+      veil("veilPrev3", false);
+      return;
+    }
+    document.getElementById("prev3Img").src = state.photo;
+    veil("veilPrev3", "🎨 Painting… ~30s");
+    ensureArt().then(function (art) {
+      document.getElementById("prev3Img").src = art;
+      veil("veilPrev3", false);
+    }).catch(function (e) {
+      veil("veilPrev3", e.code === 402 ? "📧 Email needed — continue →" : "😔 " + e.message);
+    });
   });
   wireGrid("giftGrid", "giftNext", function (c) {
     state.gift = c.dataset.gift;
     state.price = parseFloat(c.dataset.price);
+    if (!state.photo) return;
+    var box = document.getElementById("livePrev4");
+    var giftKey = GIFT_KEYS[state.gift];
+    box.style.display = "block";
+    if (mockCache[giftKey]) {
+      document.getElementById("prev4Img").src = mockCache[giftKey];
+      veil("veilPrev4", false);
+      return;
+    }
+    document.getElementById("prev4Img").src = lastArt || state.photo;
+    veil("veilPrev4", "🏺 Pressing… ~25s");
+    ensureMock(giftKey).then(function (m) {
+      document.getElementById("prev4Img").src = m;
+      veil("veilPrev4", false);
+    }).catch(function (e) {
+      veil("veilPrev4", e.code === 402 ? "📧 Email needed — continue →" : "😔 " + e.message);
+    });
   });
 
   /* Summary + toy economics */
@@ -537,7 +579,7 @@
   catch (e) { SKEY = "nostore-" + Math.random().toString(36).slice(2); }
   var STYLE_KEYS = { "The Renaissance Noble": "renaissance", "The Saturday Cartoon": "cartoon", "The '85 Glamour Shot": "glamour", "The Marble Bust": "marble" };
   var GIFT_KEYS = { "The Ceremonial Mug": "mug", "The Monument Tee": "tee", "The Heirloom Blanket": "blanket", "The Gallery Poster": "poster" };
-  var artPromise = null, artStyle = null, mockCache = {}, lastArt = null;
+  var artPromise = null, artStyle = null, mockCache = {}, mockPromises = {}, lastArt = null;
 
   function dgEmail() {
     try { return localStorage.dgEmail || null; } catch (e) { return null; }
@@ -568,7 +610,7 @@
 
   function ensureArt() {
     var styleKey = STYLE_KEYS[state.style];
-    if (artStyle !== styleKey) { artPromise = null; mockCache = {}; lastArt = null; }
+    if (artStyle !== styleKey) { artPromise = null; mockCache = {}; mockPromises = {}; lastArt = null; }
     if (!artPromise && state.photo) {
       artStyle = styleKey;
       artPromise = dgRender({ photo: state.photo, style: styleKey }).then(function (d) {
@@ -578,6 +620,22 @@
       artPromise.catch(function () {});
     }
     return artPromise || Promise.reject(new Error("Upload a photo first"));
+  }
+
+  function ensureMock(giftKey) {
+    return ensureArt().then(function (art) {
+      if (mockCache[giftKey]) return mockCache[giftKey];
+      if (!mockPromises[giftKey]) {
+        mockPromises[giftKey] = dgRender({ art_url: art, products: [giftKey] }).then(function (d) {
+          mockCache[giftKey] = d.mockups[giftKey];
+          return mockCache[giftKey];
+        }).catch(function (e) {
+          delete mockPromises[giftKey];
+          throw e;
+        });
+      }
+      return mockPromises[giftKey];
+    });
   }
 
   function veil(id, text) {
@@ -609,9 +667,8 @@
       document.getElementById("summaryArt2").style.display = "block";
       document.getElementById("mockupImg").src = art;
       veil("veilMock", "🏺 Pressing onto " + state.gift.replace("The ", "the ") + "… ~25s");
-      return dgRender({ art_url: art, products: [giftKey] }).then(function (d) {
-        mockCache[giftKey] = d.mockups[giftKey];
-        showMock(d.mockups[giftKey]);
+      return ensureMock(giftKey).then(function (m) {
+        showMock(m);
         veil("veilMock", false);
         status.textContent = "✓ Rendered live from your photo.";
       });
