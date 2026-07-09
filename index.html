@@ -462,7 +462,12 @@
     document.getElementById("progressFill").style.width = (cur / (steps.length - 1)) * 100 + "%";
     window.scrollTo(0, 0);
     if (cur === 3) buildCaptionChips();
+    if (cur === 4 && state.wittyGiftKey && !document.querySelector("#giftGrid .choice.selected")) {
+      var recCard = document.querySelector('#giftGrid .choice[data-gift="' + GIFT_NAMES[state.wittyGiftKey] + '"]');
+      if (recCard) recCard.click();
+    }
     if (cur === 5) renderSummary();
+    if (typeof refreshPanels === "function") refreshPanels();
   }
 
   document.querySelectorAll("[data-next]").forEach(function (b) {
@@ -545,8 +550,9 @@
     }).then(function (r) { return r.json(); }).then(function (d) {
       if (!d.gift) throw new Error(d.error || "riddles");
       state.witty = d;
+      state.wittyGiftKey = d.gift.product;
       var names = { mug: "☕ The Ceremonial Mug", tee: "👕 The Monument Tee", blanket: "🛋️ The Heirloom Blanket", poster: "🖼️ The Gallery Poster" };
-      finish([(names[d.gift.product] || d.gift.product) + " — " + d.gift.reason]);
+      finish([(names[d.gift.product] || d.gift.product) + " — " + d.gift.reason + " (we\u2019ll preselect it)"]);
     }).catch(function () { finish(keywordHits(t)); });
   });
 
@@ -645,6 +651,7 @@
   var GIFT_KEYS = { "The Ceremonial Mug": "mug", "The Monument Tee": "tee", "The Heirloom Blanket": "blanket", "The Gallery Poster": "poster" };
   var artPromise = null, artStyle = null, mockCache = {}, mockPromises = {}, lastArt = null;
   var DEMO_MOCKS = { mug: "demo/mug.jpg", tee: "demo/tee.jpg", poster: "demo/poster.jpg", blanket: "demo/blanket.jpg" };
+  var GIFT_NAMES = { mug: "The Ceremonial Mug", tee: "The Monument Tee", blanket: "The Heirloom Blanket", poster: "The Gallery Poster" };
   var DEMO_ART = "demo/renaissance-art.png";
   function absUrl(p) { return new URL(p, location.href).href; }
 
@@ -700,6 +707,28 @@
       pill.hidden = true;
       document.getElementById("pillBarFill").style.width = "0%";
     }, 2500);
+  }
+
+  function refreshPanels() {
+    var giftKey = GIFT_KEYS[state.gift];
+    if (lastArt && artStyle === STYLE_KEYS[state.style]) {
+      if (document.getElementById("livePrev3").style.display !== "none") {
+        document.getElementById("prev3Img").src = lastArt;
+        veil("veilPrev3", false);
+      }
+      document.getElementById("summaryImg").src = lastArt;
+      veil("veilArt", false);
+    }
+    if (mockCache[giftKey]) {
+      if (document.getElementById("livePrev4").style.display !== "none") {
+        document.getElementById("prev4Img").src = mockCache[giftKey];
+        veil("veilPrev4", false);
+      }
+      if (cur === 5) {
+        showMock(mockCache[giftKey]);
+        veil("veilMock", false);
+      }
+    }
   }
 
   function startArtPreview() {
@@ -767,6 +796,7 @@
       artPromise = dgRender({ photo: state.photo, style: styleKey, caption: state.caption || undefined }).then(function (d) {
         lastArt = d.art;
         atelierDone("✓ Portrait ready");
+        refreshPanels();
         return d.art;
       });
       artPromise.catch(function () { atelierDone("😔 The atelier hiccuped"); });
@@ -782,6 +812,7 @@
         mockPromises[giftKey] = dgRender({ art_url: art, products: [giftKey] }).then(function (d) {
           mockCache[giftKey] = d.mockups[giftKey];
           atelierDone("✓ Preview ready");
+          refreshPanels();
           return mockCache[giftKey];
         }).catch(function (e) {
           delete mockPromises[giftKey];
@@ -922,15 +953,28 @@
     document.querySelector("#s0 h1").innerHTML = "Huzzah!<br>It is done.";
     document.querySelector("#s0 .lede").innerHTML = "Payment received. This is what the masters are producing — a confirmation email is on its way to your inbox. <em>They suspect nothing.</em>";
     document.querySelector("#s0 .btn").innerHTML = "Immortalize another friend →";
+    var applyOrder = function (img, plaqueText) {
+      var heroImg = document.querySelector("#heroArt img");
+      heroImg.src = img;
+      heroImg.alt = "Your commissioned piece";
+      document.querySelector("#heroArt .plaque").textContent = plaqueText;
+    };
     try {
       var lo = JSON.parse(localStorage.dgLastOrder || "null");
-      if (lo && lo.img) {
-        var heroImg = document.querySelector("#heroArt img");
-        heroImg.src = lo.img;
-        heroImg.alt = "Your commissioned piece";
-        document.querySelector("#heroArt .plaque").textContent = lo.gift + " — " + lo.style;
-      }
+      if (lo && lo.img) applyOrder(lo.img, lo.gift + " — " + lo.style);
     } catch (e) {}
+    var sid = new URLSearchParams(location.search).get("sid");
+    if (sid) {
+      fetch(CONFIG.url + "/functions/v1/dg-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
+        body: JSON.stringify({ lookup_session_id: sid })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d && d.preview_url) {
+          applyOrder(d.preview_url, (GIFT_NAMES[d.product] || d.product) + " — " + d.style);
+        }
+      }).catch(function (e) {});
+    }
   } else if (location.search.indexOf("order=cancelled") !== -1) {
     document.querySelector("#s0 .lede").innerHTML = "Checkout abandoned. <em>Cold feet? They deserve immortality. The mug waits.</em>";
   }
