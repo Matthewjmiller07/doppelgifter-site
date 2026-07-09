@@ -482,6 +482,7 @@
     state.style = c.dataset.style;
     var img = c.querySelector("img");
     state.styleImg = img ? img.src : null;
+    if (state.photo) ensureArt();
   });
   wireGrid("giftGrid", "giftNext", function (c) {
     state.gift = c.dataset.gift;
@@ -543,19 +544,27 @@
     document.getElementById("mockupImg").src = url;
   }
 
+  function ensureArt() {
+    var styleKey = STYLE_KEYS[state.style];
+    if (artStyle !== styleKey) { artPromise = null; mockCache = {}; lastArt = null; }
+    if (!artPromise && state.photo) {
+      artStyle = styleKey;
+      artPromise = dgRender({ photo: state.photo, style: styleKey }).then(function (d) {
+        lastArt = d.art;
+        return d.art;
+      });
+      artPromise.catch(function () {});
+    }
+    return artPromise || Promise.reject(new Error("Upload a photo first"));
+  }
+
   function liveRender() {
     if (!state.photo) return;
     var status = document.getElementById("renderStatus");
     status.style.display = "block";
-    var styleKey = STYLE_KEYS[state.style], giftKey = GIFT_KEYS[state.gift];
-    if (artStyle !== styleKey) { artPromise = null; mockCache = {}; }
-    if (!artPromise) {
-      artStyle = styleKey;
-      status.textContent = "🎨 The atelier is painting their likeness… (~30 seconds)";
-      artPromise = dgRender({ photo: state.photo, style: styleKey }).then(function (d) { return d.art; });
-    }
-    artPromise.then(function (art) {
-      lastArt = art;
+    var giftKey = GIFT_KEYS[state.gift];
+    if (!lastArt) status.textContent = "🎨 The atelier is painting their likeness… (~30 seconds)";
+    ensureArt().then(function (art) {
       document.getElementById("summaryImg").src = art;
       if (mockCache[giftKey]) {
         showMock(mockCache[giftKey]);
@@ -566,7 +575,7 @@
       return dgRender({ art_url: art, products: [giftKey] }).then(function (d) {
         mockCache[giftKey] = d.mockups[giftKey];
         showMock(d.mockups[giftKey]);
-        status.textContent = "✓ Rendered live from your photo. Cost to the house: about 3¢.";
+        status.textContent = "✓ Rendered live from your photo.";
       });
     }).catch(function (e) {
       artPromise = null;
@@ -591,24 +600,36 @@
 
   document.getElementById("payBtn").addEventListener("click", function () {
     var btn = this;
-    if (!lastArt) {
-      document.getElementById("paidNote").style.display = "block";
-      document.getElementById("paidNote").textContent = "Demo mode: upload a photo on step 1 to unlock real checkout.";
+    var note = document.getElementById("paidNote");
+    if (!state.photo) {
+      note.style.display = "block";
+      note.textContent = "Demo mode: upload a photo on step 1 to unlock real checkout.";
       return;
     }
     btn.disabled = true;
-    btn.textContent = "Opening the treasury…";
-    fetch(CONFIG.url + "/functions/v1/dg-checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
-      body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: lastArt, email: dgEmail() })
-    }).then(function (res) { return res.json(); }).then(function (d) {
-      if (d.url) { location.href = d.url; return; }
-      throw new Error(d.error || "checkout failed");
+    btn.textContent = "Waiting for the atelier to finish…";
+    ensureArt().then(function (art) {
+      btn.textContent = "Opening the treasury…";
+      return fetch(CONFIG.url + "/functions/v1/dg-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
+        body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: art, email: dgEmail() })
+      }).then(function (res) { return res.json(); }).then(function (d) {
+        if (d.url) { location.href = d.url; return; }
+        throw new Error(d.error || "checkout failed");
+      });
     }).catch(function (e) {
       btn.disabled = false;
+      artPromise = null;
+      if (e && e.code === 402) {
+        btn.textContent = "Pay & immortalize";
+        note.style.display = "block";
+        note.textContent = "One step first: enter your email above so the atelier can finish the render.";
+        document.getElementById("emailGate").style.display = "block";
+        document.getElementById("renderStatus").style.display = "block";
+        return;
+      }
       btn.textContent = "Pay & immortalize — retry";
-      var note = document.getElementById("paidNote");
       note.style.display = "block";
       note.textContent = "The treasury hiccuped: " + e.message;
     });
