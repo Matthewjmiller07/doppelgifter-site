@@ -239,6 +239,22 @@
     background: var(--ground-raise); border: 1px solid var(--line);
     border-radius: 4px; padding: 6px 12px; box-shadow: var(--shadow);
   }
+  #atelierPill {
+    position: fixed; right: 18px; bottom: 18px; z-index: 70;
+    background: var(--ground-raise); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: var(--shadow); padding: 12px 16px 14px;
+    display: flex; align-items: center; gap: 10px; max-width: 320px;
+  }
+  #atelierPill[hidden] { display: none; }
+  #atelierPill .pillring {
+    width: 18px; height: 18px; flex: none; border-radius: 50%;
+    border: 3px solid color-mix(in srgb, var(--gilt-bright) 30%, transparent);
+    border-top-color: var(--gilt-bright); animation: dgspin 1s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) { #atelierPill .pillring { animation: none; opacity: 0.6; } }
+  #pillText { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  #pillBar { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; border-radius: 0 0 10px 10px; overflow: hidden; }
+  #pillBarFill { height: 100%; width: 0%; background: var(--gilt-bright); transition: width 0.5s linear; }
 </style>
 
 <div id="progress"><div id="progressFill"></div></div>
@@ -333,6 +349,11 @@
         <span class="cdesc">For friends who peaked in antiquity.</span>
       </button>
     </div>
+    <div style="margin-top:26px;">
+      <label class="okline" for="captionInput" style="display:block; margin-bottom:6px;"><b>Add an inscription</b> — optional, hand-lettered beneath their likeness</label>
+      <input id="captionInput" maxlength="40" placeholder="e.g. Dave the Magnificent" style="width:100%; max-width:340px; padding:10px 12px; border:1px solid var(--line); border-radius:4px; background:var(--ground-raise); color:var(--ink); font-family:inherit; font-size:15px;">
+      <div id="captionChips" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;"></div>
+    </div>
     <div id="livePrev3" style="display:none; margin-top:24px; max-width:230px; position:relative;">
       <img class="framed" id="prev3Img" alt="Your live render" style="aspect-ratio:1/1; object-fit:cover;">
       <div class="veil" id="veilPrev3"><div class="ring"></div><div class="veilText">Painting…</div></div>
@@ -405,7 +426,7 @@
         <p class="okline">Final 300-DPI render happens only after payment clears — previews cost us pennies, masterpieces cost us slightly more pennies.</p>
         <p class="okline" id="renderStatus" style="display:none; font-weight:600;"></p>
         <div id="emailGate" style="display:none; margin-top:14px;">
-          <p class="okline" style="margin:0 0 8px;"><b>The first masterpiece was on the house.</b> Leave your email and the atelier keeps painting — plus the occasional dangerously good gift idea in your inbox.</p>
+          <p class="okline" style="margin:0 0 8px;"><b>The first masterpiece was on the house.</b> Leave your email once — this device is remembered — and the atelier keeps painting, plus the occasional dangerously good gift idea in your inbox.</p>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <input id="gateEmail" type="email" placeholder="you@example.com" autocomplete="email" style="flex:1 1 200px; padding:10px 12px; border:1px solid var(--line); border-radius:4px; background:var(--ground-raise); color:var(--ink); font-family:inherit; font-size:15px;">
             <button class="btn" id="gateBtn" style="padding:10px 18px;">Unlock the atelier →</button>
@@ -419,11 +440,17 @@
   </div>
 </section>
 
+<div id="atelierPill" hidden>
+  <span class="pillring"></span>
+  <span id="pillText"></span>
+  <div id="pillBar"><div id="pillBarFill"></div></div>
+</div>
+
 <script>
 (function () {
   var steps = ["s0", "s1", "s2", "s3", "s4", "s5"];
   var cur = 0;
-  var state = { photo: null, style: "The Renaissance Noble", styleImg: null, gift: "The Ceremonial Mug", price: 24.99 };
+  var state = { photo: null, style: "The Renaissance Noble", styleImg: null, gift: "The Ceremonial Mug", price: 24.99, caption: "" };
 
   var styleImgs = {};
 
@@ -434,6 +461,7 @@
     });
     document.getElementById("progressFill").style.width = (cur / (steps.length - 1)) * 100 + "%";
     window.scrollTo(0, 0);
+    if (cur === 3) buildCaptionChips();
     if (cur === 5) renderSummary();
   }
 
@@ -623,16 +651,96 @@
     document.getElementById("mockupImg").src = url;
   }
 
+  var pillTimer = null, pillHide = null;
+  function atelierStart(label, secs) {
+    var pill = document.getElementById("atelierPill");
+    clearInterval(pillTimer); clearTimeout(pillHide);
+    pill.hidden = false;
+    var start = Date.now();
+    function tick() {
+      var el = (Date.now() - start) / 1000;
+      var left = Math.max(0, Math.ceil(secs - el));
+      document.getElementById("pillText").textContent = label + "… " + (left > 0 ? "~" + left + "s" : "any moment now");
+      document.getElementById("pillBarFill").style.width = Math.min(97, el / secs * 100) + "%";
+    }
+    tick();
+    pillTimer = setInterval(tick, 500);
+  }
+  function atelierDone(msg) {
+    clearInterval(pillTimer);
+    var pill = document.getElementById("atelierPill");
+    if (pill.hidden) return;
+    document.getElementById("pillText").textContent = msg;
+    document.getElementById("pillBarFill").style.width = "100%";
+    pillHide = setTimeout(function () {
+      pill.hidden = true;
+      document.getElementById("pillBarFill").style.width = "0%";
+    }, 2500);
+  }
+
+  function startArtPreview() {
+    if (!state.photo) return;
+    var box = document.getElementById("livePrev3");
+    box.style.display = "block";
+    box.querySelector(".plaque").textContent = "Your version — live";
+    document.getElementById("prev3Img").src = state.photo;
+    veil("veilPrev3", "🎨 Painting…");
+    ensureArt().then(function (art) {
+      document.getElementById("prev3Img").src = art;
+      veil("veilPrev3", false);
+    }).catch(function (e) {
+      veil("veilPrev3", e.code === 402 ? "📧 Email needed — continue →" : "😔 " + e.message);
+    });
+  }
+
+  function buildCaptionChips() {
+    var t = document.getElementById("aboutText").value || "";
+    var m = t.match(/[A-Z][a-z]+/);
+    var name = m ? m[0] : "The Legend";
+    var ideas = [name + " the Magnificent", "Certified national treasure"];
+    if (/coffee|espresso|latte|caffeine|tea/i.test(t)) ideas.unshift("Powered by coffee & audacity");
+    if (/sourdough|bread|bake|cook|chef|food/i.test(t)) ideas.unshift("In crust we trust");
+    if (/dog|cat|pet/i.test(t)) ideas.unshift("Patron saint of good boys");
+    if (/gym|run|sport|bike|hik/i.test(t)) ideas.unshift("Built different, allegedly");
+    if (/wine|art|museum|fancy/i.test(t)) ideas.unshift("Distinguished since birth");
+    if (/golf/i.test(t)) ideas.unshift("Lord of the links");
+    if (/cry|cries|emotional|soft/i.test(t)) ideas.unshift("Feelings: managed (barely)");
+    var chips = document.getElementById("captionChips");
+    chips.innerHTML = "";
+    ideas.slice(0, 4).forEach(function (s) {
+      var el = document.createElement("button");
+      el.type = "button";
+      el.className = "chip";
+      el.style.cursor = "pointer";
+      el.textContent = s;
+      el.addEventListener("click", function () {
+        document.getElementById("captionInput").value = s;
+        applyCaption(s);
+      });
+      chips.appendChild(el);
+    });
+  }
+
+  function applyCaption(v) {
+    v = (v || "").trim().slice(0, 40);
+    if (v === state.caption) return;
+    state.caption = v;
+    artPromise = null; mockCache = {}; mockPromises = {}; lastArt = null;
+    startArtPreview();
+  }
+
   function ensureArt() {
     var styleKey = STYLE_KEYS[state.style];
     if (artStyle !== styleKey) { artPromise = null; mockCache = {}; mockPromises = {}; lastArt = null; }
     if (!artPromise && state.photo) {
       artStyle = styleKey;
-      artPromise = dgRender({ photo: state.photo, style: styleKey }).then(function (d) {
+      atelierStart("🎨 Painting their likeness", 35);
+      artPromise = dgRender({ photo: state.photo, style: styleKey, caption: state.caption || undefined }).then(function (d) {
         lastArt = d.art;
+        atelierDone("✓ Portrait ready");
         return d.art;
       });
-      artPromise.catch(function () {});
+      artPromise.catch(function () { atelierDone("😔 The atelier hiccuped"); });
     }
     return artPromise || Promise.reject(new Error("Upload a photo first"));
   }
@@ -641,11 +749,14 @@
     return ensureArt().then(function (art) {
       if (mockCache[giftKey]) return mockCache[giftKey];
       if (!mockPromises[giftKey]) {
+        atelierStart("🏺 Pressing onto the goods", 28);
         mockPromises[giftKey] = dgRender({ art_url: art, products: [giftKey] }).then(function (d) {
           mockCache[giftKey] = d.mockups[giftKey];
+          atelierDone("✓ Preview ready");
           return mockCache[giftKey];
         }).catch(function (e) {
           delete mockPromises[giftKey];
+          atelierDone("😔 The atelier hiccuped");
           throw e;
         });
       }
@@ -707,6 +818,7 @@
       status.textContent = "😔 The atelier hiccuped: " + e.message;
     });
   }
+  document.getElementById("captionInput").addEventListener("change", function () { applyCaption(this.value); });
   document.getElementById("gateBtn").addEventListener("click", function () {
     var v = document.getElementById("gateEmail").value.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) {
@@ -731,7 +843,7 @@
       fetch(CONFIG.url + "/functions/v1/dg-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
-        body: JSON.stringify({ style: state.style + " (demo)", product: demoGift, art_url: absUrl(DEMO_ART), preview_url: absUrl(DEMO_MOCKS[demoGift]), email: dgEmail() })
+        body: JSON.stringify({ style: state.style + " (demo)", product: demoGift, art_url: absUrl(DEMO_ART), preview_url: absUrl(DEMO_MOCKS[demoGift]), email: dgEmail(), session_key: SKEY })
       }).then(function (res) { return res.json(); }).then(function (d) {
         if (d.url) { location.href = d.url; return; }
         throw new Error(d.error || "checkout failed");
@@ -754,7 +866,7 @@
       return fetch(CONFIG.url + "/functions/v1/dg-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
-        body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: art, preview_url: mock, email: dgEmail() })
+        body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: art, preview_url: mock, email: dgEmail(), session_key: SKEY })
       }).then(function (res) { return res.json(); }).then(function (d) {
         if (d.url) { location.href = d.url; return; }
         throw new Error(d.error || "checkout failed");
