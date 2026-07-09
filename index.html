@@ -377,22 +377,22 @@
     <div class="grid" id="giftGrid">
       <button class="choice" data-gift="The Ceremonial Mug" data-price="24.99">
         <span class="giftglyph">☕</span>
-        <span class="cname">The Ceremonial Mug <span class="price">$24.99</span></span>
+        <span class="cname">The Ceremonial Mug <span class="price"><s style="opacity:.55;font-weight:500;margin-right:4px;">$34.99</s>$24.99</span></span>
         <span class="cdesc">11oz. Their face greets them every morning. Forever.</span>
       </button>
-      <button class="choice" data-gift="The Monument Tee" data-price="29.99">
+      <button class="choice" data-gift="The Monument Tee" data-price="34.99">
         <span class="giftglyph">👕</span>
-        <span class="cname">The Monument Tee <span class="price">$29.99</span></span>
+        <span class="cname">The Monument Tee <span class="price"><s style="opacity:.55;font-weight:500;margin-right:4px;">$44.99</s>$34.99</span></span>
         <span class="cdesc">Soft cotton. Wearable proof of friendship gone too far.</span>
       </button>
-      <button class="choice" data-gift="The Heirloom Blanket" data-price="49.99">
+      <button class="choice" data-gift="The Heirloom Blanket" data-price="64.99">
         <span class="giftglyph">🛋️</span>
-        <span class="cname">The Heirloom Blanket <span class="price">$49.99</span></span>
+        <span class="cname">The Heirloom Blanket <span class="price"><s style="opacity:.55;font-weight:500;margin-right:4px;">$89.99</s>$64.99</span></span>
         <span class="cdesc">50×60" fleece. Be wrapped in Dave. Comfort is complicated.</span>
       </button>
-      <button class="choice" data-gift="The Gallery Poster" data-price="34.99">
+      <button class="choice" data-gift="The Gallery Poster" data-price="44.99">
         <span class="giftglyph">🖼️</span>
-        <span class="cname">The Gallery Poster <span class="price">$34.99</span></span>
+        <span class="cname">The Gallery Poster <span class="price"><s style="opacity:.55;font-weight:500;margin-right:4px;">$59.99</s>$44.99</span></span>
         <span class="cdesc">18×24", museum matte. Hang it where guests must confront it.</span>
       </button>
     </div>
@@ -436,6 +436,10 @@
           </div>
         </div>
         
+        <label class="okline" style="display:flex; gap:9px; align-items:flex-start; margin-top:16px; cursor:pointer;">
+          <input type="checkbox" id="digitalUp" style="margin-top:3px; accent-color: var(--gilt);">
+          <span><b>Add the Digital Masterpiece file — $9.99.</b> Full-resolution download, delivered instantly by email. For framing, phone wallpapers, and tasteful gloating.</span>
+        </label>
         <button class="btn finebtn" id="payBtn">Pay & immortalize — <span id="payPrice">$29.98</span></button>
         <p class="hint" id="paidNote" style="display:none;">🎉 This is the prototype — no card was harmed. In production this is Stripe Checkout → webhook → Printify order. You sleep; the mug ships.</p>
       </div>
@@ -633,7 +637,8 @@
     document.getElementById("summaryLine").innerHTML =
       "One <b>" + state.gift + "</b>, bearing their likeness in the style of <b>" + state.style + "</b>.";
     var ship = 4.99;
-    var rev = state.price + ship;
+    var dig = document.getElementById("digitalUp").checked ? 9.99 : 0;
+    var rev = state.price + ship + dig;
     var cogsRate = { "The Ceremonial Mug": 10.13, "The Monument Tee": 13.40, "The Heirloom Blanket": 22.05, "The Gallery Poster": 12.80 };
     var cogs = cogsRate[state.gift] || 11;
     var stripe = rev * 0.029 + 0.30;
@@ -890,6 +895,7 @@
     });
   }
   document.getElementById("captionInput").addEventListener("change", function () { applyCaption(this.value); });
+  document.getElementById("digitalUp").addEventListener("change", function () { renderSummary(); });
   document.getElementById("gateBtn").addEventListener("click", function () {
     var v = document.getElementById("gateEmail").value.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) {
@@ -914,7 +920,7 @@
       fetch(CONFIG.url + "/functions/v1/dg-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
-        body: JSON.stringify({ style: state.style + " (demo)", product: demoGift, art_url: absUrl(DEMO_ART), preview_url: absUrl(DEMO_MOCKS[demoGift]), email: dgEmail(), session_key: SKEY, utm: dgUtm() })
+        body: JSON.stringify({ style: state.style + " (demo)", product: demoGift, art_url: absUrl(DEMO_ART), preview_url: absUrl(DEMO_MOCKS[demoGift]), email: dgEmail(), session_key: SKEY, utm: dgUtm(), digital: document.getElementById("digitalUp").checked })
       }).then(function (res) { return res.json(); }).then(function (d) {
         if (d.url) { location.href = d.url; return; }
         throw new Error(d.error || "checkout failed");
@@ -937,7 +943,7 @@
       return fetch(CONFIG.url + "/functions/v1/dg-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
-        body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: art, preview_url: mock, email: dgEmail(), session_key: SKEY, utm: dgUtm() })
+        body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: art, preview_url: mock, email: dgEmail(), session_key: SKEY, utm: dgUtm(), digital: document.getElementById("digitalUp").checked })
       }).then(function (res) { return res.json(); }).then(function (d) {
         if (d.url) { location.href = d.url; return; }
         throw new Error(d.error || "checkout failed");
