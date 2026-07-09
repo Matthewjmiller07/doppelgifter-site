@@ -1,3 +1,6 @@
+<!-- Meta Pixel: when the ad account exists, paste the pixel base code here
+     (Meta Events Manager → your pixel → Install manually). The site already
+     fires fbq("track", "Purchase") on the order-success page once fbq exists. -->
 <title>DoppelGifter — Their face. On stuff.</title>
 <style>
   :root {
@@ -647,6 +650,14 @@
   var SKEY;
   try { SKEY = localStorage.dgSession || (localStorage.dgSession = Math.random().toString(36).slice(2)); }
   catch (e) { SKEY = "nostore-" + Math.random().toString(36).slice(2); }
+  try {
+    var q = new URLSearchParams(location.search);
+    var utmParts = ["utm_source", "utm_medium", "utm_campaign", "utm_content"].map(function (k) {
+      var v = q.get(k); return v ? k + "=" + v : null;
+    }).filter(Boolean);
+    if (utmParts.length) localStorage.dgUtm = utmParts.join("&").slice(0, 200);
+  } catch (e) {}
+  function dgUtm() { try { return localStorage.dgUtm || undefined; } catch (e) { return undefined; } }
   var STYLE_KEYS = { "The Renaissance Noble": "renaissance", "The Saturday Cartoon": "cartoon", "The '85 Glamour Shot": "glamour", "The Marble Bust": "marble" };
   var GIFT_KEYS = { "The Ceremonial Mug": "mug", "The Monument Tee": "tee", "The Heirloom Blanket": "blanket", "The Gallery Poster": "poster" };
   var artPromise = null, artStyle = null, mockCache = {}, mockPromises = {}, lastArt = null;
@@ -903,7 +914,7 @@
       fetch(CONFIG.url + "/functions/v1/dg-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
-        body: JSON.stringify({ style: state.style + " (demo)", product: demoGift, art_url: absUrl(DEMO_ART), preview_url: absUrl(DEMO_MOCKS[demoGift]), email: dgEmail(), session_key: SKEY })
+        body: JSON.stringify({ style: state.style + " (demo)", product: demoGift, art_url: absUrl(DEMO_ART), preview_url: absUrl(DEMO_MOCKS[demoGift]), email: dgEmail(), session_key: SKEY, utm: dgUtm() })
       }).then(function (res) { return res.json(); }).then(function (d) {
         if (d.url) { location.href = d.url; return; }
         throw new Error(d.error || "checkout failed");
@@ -926,7 +937,7 @@
       return fetch(CONFIG.url + "/functions/v1/dg-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
-        body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: art, preview_url: mock, email: dgEmail(), session_key: SKEY })
+        body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: art, preview_url: mock, email: dgEmail(), session_key: SKEY, utm: dgUtm() })
       }).then(function (res) { return res.json(); }).then(function (d) {
         if (d.url) { location.href = d.url; return; }
         throw new Error(d.error || "checkout failed");
@@ -963,6 +974,9 @@
       var lo = JSON.parse(localStorage.dgLastOrder || "null");
       if (lo && lo.img) applyOrder(lo.img, lo.gift + " — " + lo.style);
     } catch (e) {}
+    if (typeof fbq === "function") {
+      try { fbq("track", "Purchase", { currency: "USD", value: state.price + 4.99 }); } catch (e) {}
+    }
     var sid = new URLSearchParams(location.search).get("sid");
     if (sid) {
       fetch(CONFIG.url + "/functions/v1/dg-checkout", {
