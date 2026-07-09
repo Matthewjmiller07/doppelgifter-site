@@ -520,7 +520,7 @@
   catch (e) { SKEY = "nostore-" + Math.random().toString(36).slice(2); }
   var STYLE_KEYS = { "The Renaissance Noble": "renaissance", "The Saturday Cartoon": "cartoon", "The '85 Glamour Shot": "glamour", "The Marble Bust": "marble" };
   var GIFT_KEYS = { "The Ceremonial Mug": "mug", "The Monument Tee": "tee", "The Heirloom Blanket": "blanket", "The Gallery Poster": "poster" };
-  var artPromise = null, artStyle = null, mockCache = {};
+  var artPromise = null, artStyle = null, mockCache = {}, lastArt = null;
 
   function dgRender(body) {
     body.session_key = SKEY;
@@ -553,6 +553,7 @@
       artPromise = dgRender({ photo: state.photo, style: styleKey }).then(function (d) { return d.art; });
     }
     artPromise.then(function (art) {
+      lastArt = art;
       document.getElementById("summaryImg").src = art;
       if (mockCache[giftKey]) {
         showMock(mockCache[giftKey]);
@@ -572,10 +573,37 @@
   }
 
   document.getElementById("payBtn").addEventListener("click", function () {
-    document.getElementById("paidNote").style.display = "block";
-    this.textContent = "Immortalized ✓";
+    var btn = this;
+    if (!lastArt) {
+      document.getElementById("paidNote").style.display = "block";
+      document.getElementById("paidNote").textContent = "Demo mode: upload a photo on step 1 to unlock real checkout.";
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = "Opening the treasury…";
+    fetch(CONFIG.url + "/functions/v1/dg-checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
+      body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: lastArt })
+    }).then(function (res) { return res.json(); }).then(function (d) {
+      if (d.url) { location.href = d.url; return; }
+      throw new Error(d.error || "checkout failed");
+    }).catch(function (e) {
+      btn.disabled = false;
+      btn.textContent = "Pay & immortalize — retry";
+      var note = document.getElementById("paidNote");
+      note.style.display = "block";
+      note.textContent = "The treasury hiccuped: " + e.message;
+    });
   });
 
   show(0);
+  if (location.search.indexOf("order=success") !== -1) {
+    document.querySelector("#s0 h1").innerHTML = "Huzzah!<br>It is done.";
+    document.querySelector("#s0 .lede").innerHTML = "Payment received. The atelier is preparing the masterpiece and a shipping confirmation will land in your inbox. <em>They suspect nothing.</em>";
+    document.querySelector("#s0 .btn").innerHTML = "Immortalize another friend →";
+  } else if (location.search.indexOf("order=cancelled") !== -1) {
+    document.querySelector("#s0 .lede").innerHTML = "Checkout abandoned. <em>Cold feet? They deserve immortality. The mug waits.</em>";
+  }
 })();
 </script>
