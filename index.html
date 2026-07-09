@@ -450,7 +450,7 @@
 (function () {
   var steps = ["s0", "s1", "s2", "s3", "s4", "s5"];
   var cur = 0;
-  var state = { photo: null, style: "The Renaissance Noble", styleImg: null, gift: "The Ceremonial Mug", price: 24.99, caption: "" };
+  var state = { photo: null, style: "The Renaissance Noble", styleImg: null, gift: "The Ceremonial Mug", price: 24.99, caption: "", witty: null };
 
   var styleImgs = {};
 
@@ -507,11 +507,7 @@
     { re: /art|museum|design|fancy|wine/i, s: "🖼️ The Gallery Poster — they think they have taste; test it" },
     { re: /sourdough|cook|chef|bake|food/i, s: "☕ The Ceremonial Mug — kitchen-adjacent humiliation" }
   ];
-  document.getElementById("oracleBtn").addEventListener("click", function () {
-    var t = document.getElementById("aboutText").value;
-    var hits = [];
-    oracle.forEach(function (o) { if (o.re.test(t)) hits.push(o.s); });
-    if (!hits.length) hits = ["🖼️ The Gallery Poster — when in doubt, make it enormous", "☕ The Ceremonial Mug — the classic for a reason"];
+  function showOracleChips(hits) {
     var chips = document.getElementById("ideaChips");
     chips.innerHTML = "";
     hits.slice(0, 3).forEach(function (s) {
@@ -521,9 +517,37 @@
       chips.appendChild(el);
     });
     document.getElementById("ideas").style.display = "block";
-    this.textContent = "Wise. Continue →";
-    this.id = "";
-    this.addEventListener("click", function () { show(cur + 1); });
+  }
+  function keywordHits(t) {
+    var hits = [];
+    oracle.forEach(function (o) { if (o.re.test(t)) hits.push(o.s); });
+    if (!hits.length) hits = ["🖼️ The Gallery Poster — when in doubt, make it enormous", "☕ The Ceremonial Mug — the classic for a reason"];
+    return hits;
+  }
+  var oracleDone = false;
+  document.getElementById("oracleBtn").addEventListener("click", function () {
+    if (oracleDone) { show(cur + 1); return; }
+    var t = document.getElementById("aboutText").value || "";
+    var btn = this;
+    var finish = function (hits) {
+      showOracleChips(hits);
+      btn.disabled = false;
+      btn.textContent = "Wise. Continue →";
+      oracleDone = true;
+    };
+    if (t.trim().length < 8) { finish(keywordHits(t)); return; }
+    btn.disabled = true;
+    btn.textContent = "The oracle is consulting the spirits…";
+    fetch(CONFIG.url + "/functions/v1/dg-witty", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
+      body: JSON.stringify({ about: t, session_key: SKEY })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.gift) throw new Error(d.error || "riddles");
+      state.witty = d;
+      var names = { mug: "☕ The Ceremonial Mug", tee: "👕 The Monument Tee", blanket: "🛋️ The Heirloom Blanket", poster: "🖼️ The Gallery Poster" };
+      finish([(names[d.gift.product] || d.gift.product) + " — " + d.gift.reason]);
+    }).catch(function () { finish(keywordHits(t)); });
   });
 
   /* Style + gift pickers */
@@ -697,7 +721,11 @@
     var t = document.getElementById("aboutText").value || "";
     var m = t.match(/[A-Z][a-z]+/);
     var name = m ? m[0] : "The Legend";
-    var ideas = [name + " the Magnificent", "Certified national treasure"];
+    var ideas;
+    if (state.witty && state.witty.inscriptions && state.witty.inscriptions.length) {
+      ideas = state.witty.inscriptions.slice();
+    } else {
+      ideas = [name + " the Magnificent", "Certified national treasure"];
     if (/coffee|espresso|latte|caffeine|tea/i.test(t)) ideas.unshift("Powered by coffee & audacity");
     if (/sourdough|bread|bake|cook|chef|food/i.test(t)) ideas.unshift("In crust we trust");
     if (/dog|cat|pet/i.test(t)) ideas.unshift("Patron saint of good boys");
@@ -705,6 +733,7 @@
     if (/wine|art|museum|fancy/i.test(t)) ideas.unshift("Distinguished since birth");
     if (/golf/i.test(t)) ideas.unshift("Lord of the links");
     if (/cry|cries|emotional|soft/i.test(t)) ideas.unshift("Feelings: managed (barely)");
+    }
     var chips = document.getElementById("captionChips");
     chips.innerHTML = "";
     ideas.slice(0, 4).forEach(function (s) {
