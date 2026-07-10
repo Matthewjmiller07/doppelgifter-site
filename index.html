@@ -378,9 +378,9 @@
     <h2>Now, the vessel.</h2>
     <p class="lede">Printed on demand, shipped from the facility nearest your victim. We hold zero inventory and even fewer regrets.</p>
     <div class="grid" id="giftGrid">
-      <button class="choice" data-gift="The Ceremonial Mug" data-price="24.99">
+      <button class="choice" data-gift="The Ceremonial Mug" data-price="29.99">
         <span class="giftglyph">☕</span>
-        <span class="cname">The Ceremonial Mug <span class="price"><s style="opacity:.55;font-weight:500;margin-right:4px;">$34.99</s>$24.99</span></span>
+        <span class="cname">The Ceremonial Mug <span class="price"><s style="opacity:.55;font-weight:500;margin-right:4px;">$34.99</s>$29.99</span></span>
         <span class="cdesc">11oz. Their face greets them every morning. Forever.</span>
       </button>
       <button class="choice" data-gift="The Monument Tee" data-price="34.99">
@@ -439,6 +439,14 @@
           </div>
         </div>
         
+        <div style="margin-top:18px;">
+          <label class="okline" for="promoInput" style="display:block; margin-bottom:6px;"><b>Have an insider code?</b></label>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <input id="promoInput" placeholder="e.g. IKNOWTHEGUY" autocomplete="off" spellcheck="false" style="flex:1 1 170px; max-width:260px; padding:10px 12px; border:1px solid var(--line); border-radius:4px; background:var(--ground-raise); color:var(--ink); font-family:inherit; font-size:15px; text-transform:uppercase; letter-spacing:.05em;">
+            <button class="btn ghost" id="promoBtn" style="padding:10px 16px; border:1px solid var(--line); border-radius:4px;">Apply</button>
+          </div>
+          <p class="okline" id="promoNote" style="display:none; margin-top:8px;"></p>
+        </div>
         <label class="okline" style="display:flex; gap:9px; align-items:flex-start; margin-top:16px; cursor:pointer;">
           <input type="checkbox" id="digitalUp" style="margin-top:3px; accent-color: var(--gilt);">
           <span><b>Add the Digital Masterpiece file — $9.99.</b> Full-resolution download, delivered instantly by email. For framing, phone wallpapers, and tasteful gloating.</span>
@@ -476,7 +484,13 @@
       var recCard = document.querySelector('#giftGrid .choice[data-gift="' + GIFT_NAMES[state.wittyGiftKey] + '"]');
       if (recCard) recCard.click();
     }
-    if (cur === 5) renderSummary();
+    if (cur === 5) {
+      if (urlPromo && !state.promoCode) {
+        var pi = document.getElementById("promoInput");
+        if (pi && !pi.value) { pi.value = urlPromo.toUpperCase(); document.getElementById("promoBtn").click(); }
+      }
+      renderSummary();
+    }
     if (typeof refreshPanels === "function") refreshPanels();
   }
 
@@ -641,7 +655,7 @@
       "One <b>" + state.gift + "</b>, bearing their likeness in the style of <b>" + state.style + "</b>.";
     var ship = 4.99;
     var dig = document.getElementById("digitalUp").checked ? 9.99 : 0;
-    var rev = state.price + ship + dig;
+    var rev = Math.max(0.5, state.price + ship + dig - (state.promoOff || 0));
     var cogsRate = { "The Ceremonial Mug": 10.13, "The Monument Tee": 13.40, "The Heirloom Blanket": 22.05, "The Gallery Poster": 12.80 };
     var cogs = cogsRate[state.gift] || 11;
     var stripe = rev * 0.029 + 0.30;
@@ -666,6 +680,8 @@
     if (utmParts.length) localStorage.dgUtm = utmParts.join("&").slice(0, 200);
   } catch (e) {}
   function dgUtm() { try { return localStorage.dgUtm || undefined; } catch (e) { return undefined; } }
+  var urlPromo = null;
+  try { urlPromo = new URLSearchParams(location.search).get("code"); } catch (e) {}
   var STYLE_KEYS = { "The Renaissance Noble": "renaissance", "The Saturday Cartoon": "cartoon", "The '85 Glamour Shot": "glamour", "The Marble Bust": "marble" };
   var GIFT_KEYS = { "The Ceremonial Mug": "mug", "The Monument Tee": "tee", "The Heirloom Blanket": "blanket", "The Gallery Poster": "poster" };
   var artPromise = null, artStyle = null, mockCache = {}, mockPromises = {}, lastArt = null;
@@ -899,6 +915,39 @@
   }
   document.getElementById("captionInput").addEventListener("change", function () { applyCaption(this.value); });
   document.getElementById("digitalUp").addEventListener("change", function () { renderSummary(); });
+
+  state.promoOff = 0; state.promoCode = null;
+  document.getElementById("promoBtn").addEventListener("click", function () {
+    var input = document.getElementById("promoInput");
+    var note = document.getElementById("promoNote");
+    var code = input.value.trim();
+    if (!code) return;
+    var btn = this;
+    btn.disabled = true; btn.textContent = "Checking…";
+    note.style.display = "block";
+    note.textContent = "The atelier consults its ledger…";
+    fetch(CONFIG.url + "/functions/v1/dg-checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
+      body: JSON.stringify({ action: "check_promo", promo: code })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      btn.disabled = false; btn.textContent = "Apply";
+      if (d.valid) {
+        state.promoOff = d.amount_off || 0;
+        state.promoCode = d.code;
+        input.value = d.code;
+        note.innerHTML = "✓ <b>" + d.code + "</b> accepted — $" + d.amount_off.toFixed(2) + " off. Your connections have paid off.";
+        renderSummary();
+      } else {
+        state.promoOff = 0; state.promoCode = null;
+        note.textContent = "😔 " + (d.error || "Unknown code.");
+        renderSummary();
+      }
+    }).catch(function () {
+      btn.disabled = false; btn.textContent = "Apply";
+      note.textContent = "The ledger is unreachable. Try again.";
+    });
+  });
   document.getElementById("gateBtn").addEventListener("click", function () {
     var v = document.getElementById("gateEmail").value.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) {
@@ -926,7 +975,7 @@
       fetch(CONFIG.url + "/functions/v1/dg-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
-        body: JSON.stringify({ style: state.style + " (demo)", product: demoGift, art_url: absUrl(DEMO_ART), preview_url: absUrl(DEMO_MOCKS[demoGift]), email: dgEmail(), session_key: SKEY, utm: dgUtm(), digital: document.getElementById("digitalUp").checked })
+        body: JSON.stringify({ style: state.style + " (demo)", product: demoGift, art_url: absUrl(DEMO_ART), preview_url: absUrl(DEMO_MOCKS[demoGift]), email: dgEmail(), session_key: SKEY, utm: dgUtm(), digital: document.getElementById("digitalUp").checked, promo: state.promoCode || undefined })
       }).then(function (res) { return res.json(); }).then(function (d) {
         if (d.url) { location.href = d.url; return; }
         throw new Error(d.error || "checkout failed");
@@ -949,7 +998,7 @@
       return fetch(CONFIG.url + "/functions/v1/dg-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
-        body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: art, preview_url: mock, email: dgEmail(), session_key: SKEY, utm: dgUtm(), digital: document.getElementById("digitalUp").checked })
+        body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: art, preview_url: mock, email: dgEmail(), session_key: SKEY, utm: dgUtm(), digital: document.getElementById("digitalUp").checked, promo: state.promoCode || undefined })
       }).then(function (res) { return res.json(); }).then(function (d) {
         if (d.url) { location.href = d.url; return; }
         throw new Error(d.error || "checkout failed");
