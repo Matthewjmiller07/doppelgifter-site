@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DoppelGifter — Meet the Team. All of Him.</title>
+<meta name="description" content="The six dedicated professionals behind DoppelGifter. They are all the same man.">
+<style>
+  :root {
+    --ground: #F5F1E6;
+    --ground-raise: #FDFBF4;
+    --ink: #1E3329;
+    --ink-soft: #52655B;
+    --line: #D8D0BC;
+    --gilt: #A87F1F;
+    --gilt-bright: #C8A028;
+    --seal: #B03A2E;
+    --frame-outer: #8A6914;
+    --frame-inner: #E4C158;
+    --shadow: 0 2px 14px rgba(30, 51, 41, 0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #142720;
+      --ground-raise: #1C332A;
+      --ink: #EDE6D3;
+      --ink-soft: #9FB0A4;
+      --line: #2E4A3D;
+      --gilt: #C8A028;
+      --gilt-bright: #DDBA4A;
+      --seal: #C4483B;
+      --shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #142720; --ground-raise: #1C332A; --ink: #EDE6D3; --ink-soft: #9FB0A4;
+    --line: #2E4A3D; --gilt: #C8A028; --gilt-bright: #DDBA4A; --seal: #C4483B;
+    --shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --ground: #F5F1E6; --ground-raise: #FDFBF4; --ink: #1E3329; --ink-soft: #52655B;
+    --line: #D8D0BC; --gilt: #A87F1F; --gilt-bright: #C8A028; --seal: #B03A2E;
+    --shadow: 0 2px 14px rgba(30, 51, 41, 0.10);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  .serif { font-family: "Palatino", "Iowan Old Style", "Book Antiqua", "Palatino Linotype", Georgia, serif; }
+
+  #brandbar {
+    position: fixed; top: 12px; left: 0; right: 0; z-index: 40;
+    display: flex; justify-content: center; pointer-events: none;
+  }
+  #brandbar a {
+    pointer-events: auto; text-decoration: none;
+    font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--ink-soft); font-weight: 600;
+  }
+  #brandbar b { color: var(--gilt); }
+
+  main { max-width: 1020px; margin: 0 auto; padding: 110px 24px 60px; }
+
+  .qnum {
+    font-size: 12px; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--gilt); font-weight: 700; margin-bottom: 14px;
+  }
+  h1, h2 {
+    font-family: "Palatino", "Iowan Old Style", "Book Antiqua", Georgia, serif;
+    font-weight: 500; line-height: 1.12; margin: 0 0 16px; text-wrap: balance;
+  }
+  h1 { font-size: clamp(40px, 7vw, 68px); letter-spacing: -0.01em; }
+  .lede { font-size: 17px; color: var(--ink-soft); max-width: 60ch; margin: 0 0 12px; }
+  .lede em { color: var(--ink); font-style: italic; }
+
+  .gallery {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+    gap: 42px 34px; margin-top: 52px;
+  }
+  .portrait { text-align: center; }
+  .framed {
+    border: 10px solid var(--frame-inner);
+    outline: 6px solid var(--frame-outer);
+    box-shadow: var(--shadow);
+    display: block; width: 100%; aspect-ratio: 1; object-fit: cover;
+    background: var(--ground-raise);
+  }
+  .plaque {
+    display: inline-block; margin-top: 16px; padding: 5px 16px;
+    background: var(--ground-raise); border: 1px solid var(--line); border-radius: 3px;
+    font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .plaque b { color: var(--gilt); letter-spacing: 0.16em; }
+  .bio {
+    font-size: 14px; color: var(--ink-soft); max-width: 40ch;
+    margin: 12px auto 0; text-align: center;
+  }
+  .bio em { color: var(--ink); }
+
+  .org {
+    margin-top: 72px; text-align: center;
+    background: var(--ground-raise); border: 1px solid var(--line); border-radius: 8px;
+    padding: 34px 26px;
+  }
+  .org h2 { font-size: clamp(24px, 3.5vw, 32px); }
+  .org p { color: var(--ink-soft); max-width: 54ch; margin: 0 auto 6px; font-size: 15px; }
+  .org p b { color: var(--ink); }
+
+  .actions { display: flex; justify-content: center; margin-top: 44px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--seal); color: #fff; cursor: pointer; text-decoration: none;
+    font-size: 17px; font-weight: 600; padding: 14px 28px; border-radius: 4px;
+    box-shadow: var(--shadow); font-family: inherit;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:focus-visible { outline: 3px solid var(--gilt-bright); outline-offset: 2px; }
+
+  footer {
+    text-align: center; padding: 26px 24px 40px;
+    font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft);
+  }
+</style>
+</head>
+<body>
+
+<div id="brandbar"><a href="index.html">Doppel<b>Gifter</b> · Fine Commemorative Goods</a></div>
+
+<main>
+  <div class="qnum">The Atelier · Staff Directory · Headcount: 1</div>
+  <h1>Meet the team.<br>All of him.</h1>
+  <p class="lede">
+    DoppelGifter is proudly powered by six dedicated professionals who share a vision,
+    a work ethic, and — on closer inspection — <em>a face</em>.
+  </p>
+  <p class="lede">
+    We put one man's likeness on everything. It started with the org chart.
+  </p>
+
+  <div class="gallery">
+
+    <figure class="portrait" style="margin:0">
+      <img class="framed" src="about/founder.webp" alt="Renaissance oil painting of Matthew as a smug noble founder holding a mug printed with his own face">
+      <figcaption>
+        <span class="plaque"><b>Matthew Miller</b> · Founder &amp; Chief Doppelgänger</span>
+        <p class="bio">Had one good idea and immediately put his face on it. Refers to the mirror as <em>"the board."</em> The board approves everything.</p>
+      </figcaption>
+    </figure>
+
+    <figure class="portrait" style="margin:0">
+      <img class="framed" src="about/court-painter.webp" alt="Renaissance painting of Matthew as a court painter at an easel, painting a portrait of himself">
+      <figcaption>
+        <span class="plaque"><b>Matteo di Millero</b> · Court Painter</span>
+        <p class="bio">Classically trained (watched a documentary). Every portrait he paints comes out looking suspiciously like the founder. Nobody has raised this.</p>
+      </figcaption>
+    </figure>
+
+    <figure class="portrait" style="margin:0">
+      <img class="framed" src="about/fulfillment.webp" alt="Renaissance painting of Matthew in noble dress sealing a cardboard shipping box with a tape gun">
+      <figcaption>
+        <span class="plaque"><b>Matt "Two-Day" Miller</b> · Head of Fulfillment</span>
+        <p class="bio">Personally escorts every parcel to the post office like a royal procession. The tape gun has a name. The name is also Matthew.</p>
+      </figcaption>
+    </figure>
+
+    <figure class="portrait" style="margin:0">
+      <img class="framed" src="about/customer-happiness.webp" alt="Renaissance painting of Matthew as a courtier wearing a modern call-center headset over a ruff collar">
+      <figcaption>
+        <span class="plaque"><b>M. Miller, Esq.</b> · Customer Happiness</span>
+        <p class="bio">Answers every email within the hour, largely because he is also the one who caused the problem. Has never once escalated a ticket. To whom?</p>
+      </figcaption>
+    </figure>
+
+    <figure class="portrait" style="margin:0">
+      <img class="framed" src="about/quality-control.webp" alt="Renaissance painting of Matthew as a stern guild inspector examining a mug through a magnifying glass">
+      <figcaption>
+        <span class="plaque"><b>Matthieu LeMiller</b> · Guild Inspector, Quality</span>
+        <p class="bio">Holds every mug to the light and asks, <em>"Is the face crisp?"</em> Rejection rate: brutal. Conflict of interest: enormous. The face is his.</p>
+      </figcaption>
+    </figure>
+
+    <figure class="portrait" style="margin:0">
+      <img class="framed" src="about/keeper-of-ledger.webp" alt="Renaissance painting of Matthew as a treasurer writing in an enormous leather ledger by candlelight">
+      <figcaption>
+        <span class="plaque"><b>Matthew of Antwerp</b> · Keeper of the Ledger</span>
+        <p class="bio">Records every render, every farthing, every mug in an ancient ledger (it is a CSV). Approves all expenses after a stern discussion with himself.</p>
+      </figcaption>
+    </figure>
+
+  </div>
+
+  <div class="org">
+    <h2 class="serif">A note on our org chart</h2>
+    <p>Every arrow points to the same man. HR describes the culture as <b>"unanimous."</b>
+       The annual company retreat is a table for one, and attendance is always 100%.</p>
+    <p>Payroll, mercifully, is simple.</p>
+  </div>
+
+  <div class="actions">
+    <a class="btn" href="index.html">Put someone else's face on stuff →</a>
+  </div>
+</main>
+
+<footer>DoppelGifter · Fine Commemorative Goods · Six job titles, one man, zero shame</footer>
+
+</body>
+</html>
