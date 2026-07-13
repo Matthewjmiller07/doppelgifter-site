@@ -1,0 +1,831 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DoppelGifter — The Parlour Deck. Charades, but it's their face.</title>
+<meta name="description" content="A charades deck where every single card is their face. Upload a photo, preview the cards, play right here, then get the printed deck.">
+<style>
+  :root {
+    --ground: #F5F1E6;
+    --ground-raise: #FDFBF4;
+    --ink: #1E3329;
+    --ink-soft: #52655B;
+    --line: #D8D0BC;
+    --gilt: #A87F1F;
+    --gilt-bright: #C8A028;
+    --seal: #B03A2E;
+    --frame-outer: #8A6914;
+    --frame-inner: #E4C158;
+    --shadow: 0 2px 14px rgba(30, 51, 41, 0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #142720; --ground-raise: #1C332A; --ink: #EDE6D3; --ink-soft: #9FB0A4;
+      --line: #2E4A3D; --gilt: #C8A028; --gilt-bright: #DDBA4A; --seal: #C4483B;
+      --shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #142720; --ground-raise: #1C332A; --ink: #EDE6D3; --ink-soft: #9FB0A4;
+    --line: #2E4A3D; --gilt: #C8A028; --gilt-bright: #DDBA4A; --seal: #C4483B;
+    --shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --ground: #F5F1E6; --ground-raise: #FDFBF4; --ink: #1E3329; --ink-soft: #52655B;
+    --line: #D8D0BC; --gilt: #A87F1F; --gilt-bright: #C8A028; --seal: #B03A2E;
+    --shadow: 0 2px 14px rgba(30, 51, 41, 0.10);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  .serif { font-family: "Palatino", "Iowan Old Style", "Book Antiqua", "Palatino Linotype", Georgia, serif; }
+
+  #brandbar {
+    position: fixed; top: 12px; left: 0; right: 0; z-index: 40;
+    display: flex; justify-content: center; pointer-events: none;
+  }
+  #brandbar a {
+    pointer-events: auto; text-decoration: none;
+    font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--ink-soft); font-weight: 600;
+  }
+  #brandbar b { color: var(--gilt); }
+
+  main { max-width: 1020px; margin: 0 auto; padding: 110px 24px 60px; }
+  section { margin-bottom: 88px; }
+
+  .qnum {
+    font-size: 12px; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--gilt); font-weight: 700; margin-bottom: 14px;
+  }
+  h1, h2 {
+    font-family: "Palatino", "Iowan Old Style", "Book Antiqua", Georgia, serif;
+    font-weight: 500; line-height: 1.12; margin: 0 0 16px; text-wrap: balance;
+  }
+  h1 { font-size: clamp(40px, 7vw, 68px); letter-spacing: -0.01em; }
+  h2 { font-size: clamp(28px, 4.5vw, 40px); }
+  .lede { font-size: 17px; color: var(--ink-soft); max-width: 58ch; margin: 0 0 24px; }
+  .lede em { color: var(--ink); font-style: italic; }
+  .hint { font-size: 13px; color: var(--ink-soft); }
+  kbd {
+    border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px;
+    font-size: 12px; background: var(--ground-raise);
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--seal); color: #fff; border: none; cursor: pointer;
+    font-size: 17px; font-weight: 600; padding: 14px 28px; border-radius: 4px;
+    box-shadow: var(--shadow); font-family: inherit; text-decoration: none;
+  }
+  .btn:hover:not(:disabled) { filter: brightness(1.08); }
+  .btn:focus-visible { outline: 3px solid var(--gilt-bright); outline-offset: 2px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn.ghost {
+    background: transparent; color: var(--ink); border: 1px solid var(--line);
+    box-shadow: none;
+  }
+  .btn.small { font-size: 14px; padding: 9px 18px; }
+  .actions { display: flex; gap: 14px; flex-wrap: wrap; margin: 24px 0 10px; }
+
+  /* Upload */
+  #uploader {
+    border: 2px dashed var(--line); border-radius: 8px; background: var(--ground-raise);
+    padding: 30px 24px; text-align: center; cursor: pointer; max-width: 460px;
+  }
+  #uploader:hover, #uploader:focus-visible { border-color: var(--gilt); outline: none; }
+  #uploader p { margin: 4px 0; color: var(--ink-soft); font-size: 15px; }
+  #uploader .big { font-size: 34px; margin: 0; }
+  #setupRow { display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-start; }
+  #setupCol { flex: 1 1 300px; min-width: 280px; }
+  label { display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin: 18px 0 6px; }
+  input[type=text] {
+    width: 100%; max-width: 320px; font: inherit; color: var(--ink);
+    background: var(--ground-raise); border: 1px solid var(--line); border-radius: 4px;
+    padding: 11px 14px;
+  }
+  input[type=text]:focus-visible { outline: 2px solid var(--gilt-bright); outline-offset: 1px; }
+  #fileMeta { font-size: 12px; color: var(--ink-soft); margin-top: 10px; word-break: break-all; }
+  #paintNote { font-size: 13px; color: var(--ink-soft); margin-top: 8px; max-width: 44ch; }
+
+  /* The card itself — one design, used in the fan and in the game */
+  .ccard {
+    width: 240px; aspect-ratio: 5 / 7; border-radius: 12px;
+    background: var(--ground-raise);
+    border: 6px solid var(--frame-inner); outline: 3px solid var(--frame-outer);
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 16px 14px 12px; text-align: center; position: relative;
+    user-select: none;
+  }
+  .ccard .ribbon {
+    font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; font-weight: 700;
+    color: var(--seal); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    padding: 3px 10px; margin-bottom: 12px;
+  }
+  .ccard .artzone {
+    flex: 1 1 auto; min-height: 0; width: 100%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ccard .oval {
+    width: 62%; aspect-ratio: 4 / 5; border-radius: 50%;
+    overflow: hidden; border: 4px solid var(--frame-outer);
+    box-shadow: inset 0 0 0 2px var(--frame-inner);
+    background: var(--line); flex: none;
+  }
+  .ccard .oval img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ccard .plate {
+    width: 100%; height: 100%; border-radius: 6px;
+    overflow: hidden; border: 4px solid var(--frame-outer);
+    box-shadow: inset 0 0 0 2px var(--frame-inner);
+    background: var(--line);
+  }
+  .ccard .plate img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ccard .cveil {
+    position: absolute; inset: 0; z-index: 3; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    background: color-mix(in srgb, var(--ground) 78%, transparent);
+    font-size: 14px; font-weight: 600; color: var(--ink); padding: 12px;
+  }
+  .ccard .prompt {
+    font-family: "Palatino", "Iowan Old Style", "Book Antiqua", Georgia, serif;
+    font-size: 15px; line-height: 1.3; margin: 12px 0 0; flex: none; min-height: 58px;
+    display: flex; align-items: center; justify-content: center; color: var(--ink); text-wrap: balance;
+  }
+  .ccard .deckmark {
+    font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gilt);
+    margin-top: 8px;
+  }
+
+  /* Fanned preview */
+  #fanWrap { display: flex; justify-content: center; padding: 30px 0 10px; min-height: 380px; }
+  #fan { display: flex; align-items: center; }
+  #fan .ccard { margin: 0 -34px; transition: transform 0.25s ease; }
+  #fan .ccard:nth-child(1) { transform: rotate(-8deg) translateY(14px); }
+  #fan .ccard:nth-child(2) { transform: rotate(0deg) translateY(-6px); z-index: 2; }
+  #fan .ccard:nth-child(3) { transform: rotate(8deg) translateY(14px); }
+  #fan .ccard:hover { transform: rotate(0deg) translateY(-18px) scale(1.04); z-index: 5; }
+  @media (max-width: 640px) {
+    #fan .ccard { width: 180px; margin: 0 -44px; }
+    #fan .ccard .prompt { font-size: 13px; }
+  }
+  @media (prefers-reduced-motion: reduce) { #fan .ccard { transition: none; } }
+  #reshuffle { display: flex; justify-content: center; }
+
+  /* Game */
+  #gameShell {
+    background: var(--ground-raise); border: 1px solid var(--line); border-radius: 10px;
+    padding: 34px 26px; text-align: center;
+  }
+  #scorebar {
+    display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; margin-bottom: 22px;
+  }
+  .team {
+    border: 1px solid var(--line); border-radius: 6px; padding: 8px 18px; min-width: 150px;
+    background: var(--ground);
+  }
+  .team.turn { border-color: var(--gilt); box-shadow: 0 0 0 2px var(--gilt-bright); }
+  .team .tname { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; }
+  .team .tscore { font-family: "Palatino", Georgia, serif; font-size: 34px; line-height: 1.1; }
+
+  #timerWrap { max-width: 420px; margin: 0 auto 20px; }
+  #timerBar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  #timerFill { height: 100%; width: 100%; background: var(--gilt-bright); transition: width 0.25s linear; }
+  #timerFill.low { background: var(--seal); }
+  @media (prefers-reduced-motion: reduce) { #timerFill { transition: none; } }
+  #timerText { font-family: "Palatino", Georgia, serif; font-size: 40px; margin: 8px 0 0; }
+
+  #stage { display: flex; justify-content: center; margin: 18px 0 24px; min-height: 360px; align-items: center; }
+  #stage .ccard { width: 250px; }
+  #gameBtns { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+  .btn.got { background: #2E7D4F; }
+  .btn.pass { background: transparent; color: var(--ink); border: 1px solid var(--line); box-shadow: none; }
+  #turnBanner { font-size: 15px; color: var(--ink-soft); margin: 0 0 16px; }
+  #turnBanner b { color: var(--gilt); }
+  #roundRecap { font-size: 14px; color: var(--ink-soft); max-width: 52ch; margin: 14px auto 0; }
+
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button {
+    font: inherit; font-size: 14px; padding: 8px 16px; border: none; cursor: pointer;
+    background: transparent; color: var(--ink-soft);
+  }
+  .seg button.on { background: var(--gilt); color: #fff; }
+  #gameSetup .row { margin: 16px 0; }
+
+  /* Printed deck CTA */
+  #deckCta {
+    display: flex; gap: 34px; flex-wrap: wrap; align-items: center;
+    background: var(--ground-raise); border: 1px solid var(--line); border-radius: 10px;
+    padding: 34px 30px;
+  }
+  #deckCta .copy { flex: 1 1 320px; }
+  #deckStack { flex: 0 0 auto; position: relative; width: 210px; height: 300px; margin: 0 auto; }
+  #deckStack .ccard { width: 190px; position: absolute; top: 0; left: 0; }
+  #deckStack .ccard:nth-child(1) { transform: rotate(-6deg) translate(6px, 10px); }
+  #deckStack .ccard:nth-child(2) { transform: rotate(3deg); z-index: 2; }
+  .price { font-family: "Palatino", Georgia, serif; font-size: 30px; margin: 6px 0 2px; }
+  .price s { color: var(--ink-soft); font-size: 20px; margin-left: 10px; }
+  #deckNote { display: none; font-size: 14px; color: var(--ink-soft); margin-top: 14px; max-width: 46ch; }
+
+  footer {
+    text-align: center; padding: 26px 24px 40px;
+    font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft);
+  }
+</style>
+</head>
+<body>
+
+<div id="brandbar"><a href="index.html">Doppel<b>Gifter</b> · Fine Commemorative Goods</a></div>
+
+<main>
+
+  <!-- HERO -->
+  <section>
+    <div class="qnum">The Parlour Deck · Party Games Division · Also Him</div>
+    <h1>Charades.<br>Every card is their face.</h1>
+    <p class="lede">
+      Fifty-four charades cards. One recurring subject. Upload a photo of your favorite idiot and
+      every prompt becomes about <em>them</em> — acted out by people who love them and are
+      currently screaming <em>"WEDDING! DANCING! IT'S DAVE AT THE WEDDING!"</em>
+    </p>
+    <p class="hint">Preview the cards below, play a full game right here, then get the printed deck.</p>
+  </section>
+
+  <!-- SETUP: face + name -->
+  <section>
+    <div class="qnum">Step I · The Subject</div>
+    <h2>Who is the deck about?</h2>
+    <div id="setupRow">
+      <div id="setupCol">
+        <div id="uploader" role="button" tabindex="0" aria-label="Upload a photo of their face">
+          <p class="big">🖼️</p>
+          <p><b>Drop their face here</b> or tap to choose</p>
+          <p style="font-size:13px">Shrunk on your device before anything leaves it.</p>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" hidden>
+        <p id="fileMeta"></p>
+        <div class="actions" style="margin-top:14px">
+          <button class="btn ghost small" id="demoBtn">Skip — use the demo gentleman</button>
+          <button class="btn ghost small" id="paintBtn" style="display:none">🎨 Paint them Renaissance first (~30s)</button>
+        </div>
+        <p id="paintNote"></p>
+      </div>
+      <div id="setupCol">
+        <label for="nameInput">Their name (the cards will use it)</label>
+        <input type="text" id="nameInput" maxlength="24" placeholder="e.g. Dave">
+        <p class="hint" style="margin-top:10px">Prompts like <em>"Dave discovering the milk is empty mid-pour."</em> The name does a lot of work.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PREVIEW FAN -->
+  <section>
+    <div class="qnum">Step II · The Proof Print</div>
+    <h2>A few cards from their deck.</h2>
+    <p class="lede">Hover a card. Then have the court painter put them <em>in</em> the scene — actually doing the thing on the card.</p>
+    <div id="fanWrap"><div id="fan" aria-live="polite"></div></div>
+    <div id="reshuffle" style="gap:14px;flex-wrap:wrap">
+      <button class="btn small" id="stageBtn" style="display:none">🎭 Paint them into these scenes</button>
+      <button class="btn ghost small" id="reshuffleBtn">Deal three different cards ↻</button>
+    </div>
+    <p class="hint" id="stageNote" style="text-align:center;margin-top:12px"></p>
+    <div id="gateBox" style="display:none;max-width:420px;margin:16px auto 0;text-align:center">
+      <p class="hint" style="margin:0 0 8px">The first scenes were on the house — the atelier requires an email for more.</p>
+      <input type="text" id="gateEmail" placeholder="you@example.com" inputmode="email" autocomplete="email" style="max-width:240px">
+      <button class="btn small" id="gateBtn" style="vertical-align:top;margin-left:8px">Unlock →</button>
+    </div>
+  </section>
+
+  <!-- GAME -->
+  <section>
+    <div class="qnum">Step III · The Parlour</div>
+    <h2>Play a round right now.</h2>
+    <p class="lede">Pass-and-play. One phone, two teams, zero dignity. The actor holds the phone; everyone else guesses.</p>
+
+    <div id="gameShell">
+      <!-- setup -->
+      <div id="gameSetup">
+        <p id="turnBanner">House rules, adjustable:</p>
+        <div class="row">
+          <label style="display:inline-block;margin:0 12px 0 0">Round length</label>
+          <span class="seg" id="timeSeg">
+            <button data-secs="30">30s</button>
+            <button data-secs="60" class="on">60s</button>
+            <button data-secs="90">90s</button>
+          </span>
+        </div>
+        <div class="row">
+          <label style="display:inline-block;margin:0 12px 0 0">Rounds per team</label>
+          <span class="seg" id="roundSeg">
+            <button data-rounds="2">2</button>
+            <button data-rounds="3" class="on">3</button>
+            <button data-rounds="5">5</button>
+          </span>
+        </div>
+        <div class="actions" style="justify-content:center">
+          <button class="btn" id="startGameBtn">Convene the parlour →</button>
+        </div>
+      </div>
+
+      <!-- live game -->
+      <div id="gameLive" style="display:none">
+        <div id="scorebar">
+          <div class="team" id="teamA"><div class="tname">House Gilt</div><div class="tscore">0</div></div>
+          <div class="team" id="teamB"><div class="tname">House Seal</div><div class="tscore">0</div></div>
+        </div>
+        <p id="turnBannerLive"></p>
+        <div id="timerWrap">
+          <div id="timerBar"><div id="timerFill"></div></div>
+          <div id="timerText">60</div>
+        </div>
+        <div id="stage"></div>
+        <div id="gameBtns">
+          <button class="btn got" id="gotBtn">Got it! +1</button>
+          <button class="btn pass" id="passBtn">Pass →</button>
+        </div>
+        <p class="hint" style="margin-top:14px"><kbd>G</kbd> got it · <kbd>P</kbd> pass</p>
+      </div>
+
+      <!-- between turns / end -->
+      <div id="gameBreak" style="display:none">
+        <h2 class="serif" id="breakTitle"></h2>
+        <p id="roundRecap"></p>
+        <div class="actions" style="justify-content:center">
+          <button class="btn" id="breakBtn"></button>
+          <button class="btn ghost" id="resetBtn">Start over</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRINTED DECK -->
+  <section>
+    <div class="qnum">Step IV · The Heirloom</div>
+    <h2>Now get it printed.</h2>
+    <div id="deckCta">
+      <div id="deckStack" aria-hidden="true"></div>
+      <div class="copy">
+        <h2 class="serif" style="font-size:clamp(22px,3vw,30px)">The Parlour Deck</h2>
+        <p class="lede" style="margin-bottom:6px">
+          54 poker-size cards, linen finish, gilt tuck box. Their painted face on every single card,
+          via the same Printify presses that make our Ceremonial Mugs. It arrives looking like a
+          family heirloom and plays like a roast.
+        </p>
+        <p class="price">$24.99 <s>$29.99</s></p>
+        <p class="hint">Printed &amp; shipped by Printify · tuck box inscription included</p>
+        <div class="actions">
+          <button class="btn" id="deckBtn">Reserve their deck →</button>
+          <a class="btn ghost" href="index.html">Or start with a mug</a>
+        </div>
+        <p id="deckNote">🎉 Noted in the ledger. This is the prototype — no card was harmed.
+          In production this is Stripe Checkout → webhook → Printify's playing-card line. You play; the presses roll.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>DoppelGifter · Fine Commemorative Goods · Fifty-four cards, one face, zero shame</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var CONFIG = {
+    url: "https://knbyyykfwwlgnizutqyb.supabase.co",
+    anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuYnl5eWtmd3dsZ25penV0cXliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4MjI3MDMsImV4cCI6MjA5NjM5ODcwM30.xbArp2d_jbD28dqg5ZdjgmaqKJ6erbTtVzMv22TDsxg"
+  };
+  var SKEY;
+  try { SKEY = localStorage.dgSession || (localStorage.dgSession = Math.random().toString(36).slice(2)); }
+  catch (e) { SKEY = "nostore-" + Math.random().toString(36).slice(2); }
+
+  var DEMO_FACE = "demo/renaissance-art.png";
+  var state = { photo: null, face: DEMO_FACE, painted: false, name: "" };
+
+  /* ---------------- The deck ----------------
+     [category, prompt shown on the card, scene phrase sent to the painter] */
+  var DECK = [
+    ["Acts of Nobility", "Posing for a royal portrait that is taking hours", "posing stiffly for a royal portrait, visibly exhausted"],
+    ["Acts of Nobility", "{name} knighting a confused pigeon", "solemnly knighting a confused pigeon with a sword"],
+    ["Acts of Nobility", "Fencing an invisible rival, poorly", "fencing against an invisible rival, poorly, mid-lunge"],
+    ["Acts of Nobility", "Waving at peasants from a slow carriage", "waving regally from a gilded carriage window"],
+    ["Acts of Nobility", "Trying on a crown that is far too big", "wearing a golden crown far too big, slipping over their eyes"],
+    ["Acts of Nobility", "A dramatic royal faint onto a convenient couch", "fainting dramatically backwards onto a velvet couch, hand on forehead"],
+    ["Acts of Nobility", "Sipping tea with a fully extended pinky", "sipping tea from a tiny cup with a fully extended pinky"],
+    ["Acts of Nobility", "Reading a decree nobody asked for", "proclaiming loudly from an unfurled scroll to an empty square"],
+    ["Acts of Nobility", "Being carried by invisible servants", "reclining midair as if carried by invisible servants"],
+    ["Acts of Nobility", "A duel at dawn ({name} overslept)", "arriving late to a duel at dawn in a nightcap, holding a pillow"],
+    ["Acts of Nobility", "Blessing the harvest. The harvest is a sandwich", "solemnly blessing a sandwich presented on a golden platter"],
+    ["Acts of Nobility", "{name} unveiling a statue of {name}", "proudly unveiling a marble statue of themselves"],
+
+    ["Modern Peasantry", "Untangling headphones for all eternity", "untangling a hopeless knot of headphone wires, despairing"],
+    ["Modern Peasantry", "{name} roaming the house hunting wifi signal", "wandering with a phone raised high overhead, hunting for signal"],
+    ["Modern Peasantry", "Forgetting why you walked into the room", "standing puzzled in a doorway, having forgotten why they came"],
+    ["Modern Peasantry", "Parallel parking under public observation", "parallel parking a tiny carriage while a crowd watches, sweating"],
+    ["Modern Peasantry", "A pickle jar that will not open. Rising panic", "straining red-faced to open a stubborn pickle jar"],
+    ["Modern Peasantry", "Pretending to understand the group chat", "squinting at a phone, utterly baffled"],
+    ["Modern Peasantry", "{name} discovering the milk is empty mid-pour", "pouring from an empty milk jug over cereal, betrayed expression"],
+    ["Modern Peasantry", "Taking 47 selfies, keeping none", "taking a selfie with pursed lips, phone held aloft"],
+    ["Modern Peasantry", "Silencing the alarm without waking up", "slapping a ringing alarm clock while still fully asleep"],
+    ["Modern Peasantry", "Flat-pack furniture, no manual, much hubris", "sitting defeated among flat-pack furniture parts, holding one tiny tool"],
+    ["Modern Peasantry", "Realizing you've been on mute the whole meeting", "gesturing passionately into a headset that is on mute"],
+    ["Modern Peasantry", "Chasing a receipt in the wind", "chasing a windblown paper receipt down the street"],
+
+    ["Beasts of the Realm", "A pigeon with somewhere important to be", "strutting exactly like a pigeon with somewhere important to be"],
+    ["Beasts of the Realm", "A cat ignoring its own name", "sitting like a cat, pointedly ignoring everyone calling them"],
+    ["Beasts of the Realm", "A dog hearing the treat drawer open", "perking up ecstatically like a dog hearing the treat drawer"],
+    ["Beasts of the Realm", "A giraffe using a water fountain", "bending awkwardly like a giraffe over a tiny water fountain"],
+    ["Beasts of the Realm", "A crab late for work", "scuttling sideways like a crab, clutching a small briefcase"],
+    ["Beasts of the Realm", "A peacock at a job interview", "posing like a displaying peacock while seated at an interview desk"],
+    ["Beasts of the Realm", "A T-rex making the bed", "trying to make a bed with tiny T-rex arms held close"],
+    ["Beasts of the Realm", "A goose holding a grudge", "glowering like a furious goose, neck extended"],
+    ["Beasts of the Realm", "A sloth in a genuine hurry", "running in extremely slow motion like a sloth late for something"],
+    ["Beasts of the Realm", "An octopus folding laundry", "folding laundry with far too many arms at once"],
+    ["Beasts of the Realm", "A llama judging you silently", "staring with silent llama-like judgment, chin raised"],
+    ["Beasts of the Realm", "A penguin on an escalator", "standing proudly like a penguin riding an escalator"],
+
+    ["The Family Archive", "{name} dancing at a wedding", "dancing exuberantly at a wedding, arms flailing"],
+    ["The Family Archive", "{name}'s driving-test face", "gripping a steering wheel with a terrified driving-test face"],
+    ["The Family Archive", "{name} tasting something they claim to love", "tasting food they claim to love, barely hiding disgust"],
+    ["The Family Archive", "{name} answering an unknown number", "answering a telephone call from an unknown number with deep suspicion"],
+    ["The Family Archive", "{name} pretending the gift is exactly what they wanted", "holding up an unwanted gift with a fixed, unconvincing smile"],
+    ["The Family Archive", "{name} on a rollercoaster", "screaming on a plunging rollercoaster, hair blown back"],
+    ["The Family Archive", "{name} at the buffet, hour three", "surveying a banquet table at hour three, plate stacked absurdly high"],
+    ["The Family Archive", "{name} losing a board game gracefully (badly)", "flipping a board game table in gracious defeat"],
+    ["The Family Archive", "{name} explaining their fantasy league strategy", "explaining an elaborate strategy chart to a visibly bored audience"],
+    ["The Family Archive", "{name} sneaking a midnight snack", "sneaking a midnight snack from the pantry by candlelight"],
+    ["The Family Archive", "{name}'s signature photo smile", "striking their signature photo smile, slightly too wide"],
+    ["The Family Archive", "{name} watching a scary movie through their fingers", "peeking at something terrifying through their fingers"]
+  ];
+
+  function subjectName() {
+    var v = (document.getElementById("nameInput").value || "").trim();
+    return v || "Dave";
+  }
+  function promptText(entry) { return entry[1].replace(/\{name\}/g, subjectName()); }
+
+  var sceneCache = {}, stagingNow = {};
+  function cardEl(entry, num) {
+    var d = document.createElement("div");
+    d.className = "ccard";
+    var sceneArt = sceneCache[entry[2]];
+    var art = sceneArt
+      ? '<div class="plate"><img alt="Them, painted mid-scene"></div>'
+      : '<div class="oval"><img alt="Their face, in a gilt oval frame"></div>';
+    d.innerHTML =
+      '<div class="ribbon"></div>' +
+      '<div class="artzone">' + art + '</div>' +
+      '<div class="prompt"></div>' +
+      '<div class="deckmark">DoppelGifter Parlour Deck · No. ' + num + ' of 54</div>';
+    d.querySelector(".ribbon").textContent = entry[0];
+    d.querySelector(".artzone img").src = sceneArt || state.face;
+    d.querySelector(".prompt").textContent = promptText(entry);
+    if (stagingNow[entry[2]]) {
+      var v = document.createElement("div");
+      v.className = "cveil";
+      v.textContent = "🎨 The court painter is staging this scene…";
+      d.appendChild(v);
+    }
+    return d;
+  }
+
+  function dgRender(body) {
+    body.session_key = SKEY;
+    try { if (localStorage.dgEmail) body.email = localStorage.dgEmail; } catch (e) {}
+    return fetch(CONFIG.url + "/functions/v1/dg-render", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
+      body: JSON.stringify(body)
+    }).then(function (res) {
+      return res.json().then(function (d) {
+        if (!res.ok) { var err = new Error(d.error || ("HTTP " + res.status)); err.code = res.status; throw err; }
+        return d;
+      });
+    });
+  }
+
+  /* ---------------- Fan preview ---------------- */
+  var fanPicks = [1, 18, 37]; // knighting a pigeon / empty milk / dancing at a wedding
+  function shuffle(a) {
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function renderFan() {
+    var fan = document.getElementById("fan");
+    fan.innerHTML = "";
+    fanPicks.forEach(function (i) { fan.appendChild(cardEl(DECK[i], i + 1)); });
+  }
+  document.getElementById("reshuffleBtn").addEventListener("click", function () {
+    var idx = shuffle(DECK.map(function (_, i) { return i; }));
+    fanPicks = idx.slice(0, 3);
+    renderFan();
+    resetStageBtn();
+  });
+
+  /* ---------------- Scene staging: paint them INTO the card ---------------- */
+  var stageBtn = document.getElementById("stageBtn");
+  var stageNote = document.getElementById("stageNote");
+  function resetStageBtn() {
+    stageBtn.style.display = state.photo ? "inline-flex" : "none";
+    stageBtn.disabled = false;
+    var unstaged = fanPicks.filter(function (i) { return !sceneCache[DECK[i][2]]; }).length;
+    stageBtn.textContent = unstaged ? "🎭 Paint them into these scenes (~30s each)" : "✓ Scenes staged — deal new cards for more";
+    if (!unstaged && state.photo) stageBtn.disabled = true;
+  }
+  function stageScene(entry) {
+    var key = entry[2];
+    if (sceneCache[key]) return Promise.resolve();
+    stagingNow[key] = true;
+    refreshAllCards();
+    return dgRender({ photo: state.photo, scene: key }).then(function (d) {
+      sceneCache[key] = d.art;
+    }).finally(function () {
+      delete stagingNow[key];
+      refreshAllCards();
+    });
+  }
+  function stageAll() {
+    var entries = fanPicks.map(function (i) { return DECK[i]; })
+      .filter(function (en) { return !sceneCache[en[2]]; });
+    if (!entries.length || !state.photo) return;
+    stageBtn.disabled = true;
+    stageNote.textContent = "";
+    document.getElementById("gateBox").style.display = "none";
+    var idx = 0;
+    (function next() {
+      if (idx >= entries.length) { resetStageBtn(); stageNote.textContent = "Staged. Hover them. You're welcome."; return; }
+      stageBtn.textContent = "🎨 Staging scene " + (idx + 1) + " of " + entries.length + "… (~30s)";
+      stageScene(entries[idx]).then(function () { idx++; next(); }).catch(function (e) {
+        resetStageBtn();
+        if (e.code === 402) {
+          document.getElementById("gateBox").style.display = "block";
+          document.getElementById("gateEmail").focus();
+        } else {
+          stageNote.textContent = "😔 The atelier hiccuped: " + e.message;
+        }
+      });
+    })();
+  }
+  stageBtn.addEventListener("click", stageAll);
+  document.getElementById("gateBtn").addEventListener("click", function () {
+    var v = (document.getElementById("gateEmail").value || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) { stageNote.textContent = "That email looks forged. The ledger rejects it."; return; }
+    try { localStorage.dgEmail = v; } catch (e) {}
+    stageAll();
+  });
+  document.getElementById("gateEmail").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") document.getElementById("gateBtn").click();
+  });
+
+  function renderDeckStack() {
+    var stack = document.getElementById("deckStack");
+    stack.innerHTML = "";
+    stack.appendChild(cardEl(DECK[6], 7));
+    stack.appendChild(cardEl(DECK[fanPicks[0]], fanPicks[0] + 1));
+  }
+  function refreshAllCards() { renderFan(); renderDeckStack(); if (liveCardEntry) renderStageCard(); }
+
+  document.getElementById("nameInput").addEventListener("input", refreshAllCards);
+
+  /* ---------------- Upload + optional Renaissance paint ---------------- */
+  var uploader = document.getElementById("uploader");
+  var fileInput = document.getElementById("fileInput");
+  uploader.addEventListener("click", function () { fileInput.click(); });
+  uploader.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); } });
+  uploader.addEventListener("dragover", function (e) { e.preventDefault(); });
+  uploader.addEventListener("drop", function (e) {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener("change", function () { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+  function handleFile(f) {
+    var img = new Image();
+    img.onload = function () {
+      var maxDim = 1024;
+      var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      var c = document.createElement("canvas");
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      state.photo = c.toDataURL("image/jpeg", 0.82);
+      state.face = state.photo;
+      state.painted = false;
+      document.getElementById("fileMeta").textContent =
+        f.name + " → " + c.width + "×" + c.height + " (~" + Math.round(state.photo.length * 0.75 / 1024) + " KB, shrunk here, not uploaded)";
+      var pb = document.getElementById("paintBtn");
+      pb.style.display = "inline-flex";
+      pb.disabled = false;
+      pb.textContent = "🎨 Paint them Renaissance first (~30s)";
+      document.getElementById("paintNote").textContent = "";
+      URL.revokeObjectURL(img.src);
+      refreshAllCards();
+      resetStageBtn();
+    };
+    img.src = URL.createObjectURL(f);
+  }
+
+  document.getElementById("demoBtn").addEventListener("click", function () {
+    // The demo gentleman can act too: downscale his portrait to a data URL so scenes work.
+    var img = new Image();
+    img.onload = function () {
+      var maxDim = 1024;
+      var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      var c = document.createElement("canvas");
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      state.photo = c.toDataURL("image/jpeg", 0.82);
+      state.face = DEMO_FACE;
+      state.painted = true;
+      document.getElementById("fileMeta").textContent = "Using the demo gentleman. He has seen things.";
+      document.getElementById("paintBtn").style.display = "none";
+      document.getElementById("paintNote").textContent = "";
+      refreshAllCards();
+      resetStageBtn();
+    };
+    img.src = DEMO_FACE;
+  });
+
+  document.getElementById("paintBtn").addEventListener("click", function () {
+    if (!state.photo || state.painted) return;
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = "🎨 The court painter is at his easel…";
+    dgRender({ photo: state.photo, style: "renaissance" }).then(function (d) {
+      state.face = d.art;
+      state.painted = true;
+      btn.textContent = "✓ Painted";
+      refreshAllCards();
+    }).catch(function (e) {
+      btn.disabled = false;
+      btn.textContent = "🎨 Paint them Renaissance first (~30s)";
+      document.getElementById("paintNote").textContent = e.code === 402
+        ? "The atelier wants an email first — leave one on the main page, or play with the photo as-is. It still works."
+        : "The atelier hiccuped (" + e.message + "). The photo as-is works fine for the game.";
+    });
+  });
+
+  /* ---------------- The game ---------------- */
+  var game = {
+    secs: 60, roundsPerTeam: 3,
+    scores: [0, 0], turn: 0, roundsDone: [0, 0],
+    order: [], pos: 0, timer: null, deadline: 0, turnGot: 0, turnPass: 0
+  };
+  var liveCardEntry = null;
+  var TEAM_NAMES = ["House Gilt", "House Seal"];
+
+  function wireSeg(id, attr, apply) {
+    var seg = document.getElementById(id);
+    seg.querySelectorAll("button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        seg.querySelectorAll("button").forEach(function (x) { x.classList.remove("on"); });
+        b.classList.add("on");
+        apply(parseInt(b.dataset[attr], 10));
+      });
+    });
+  }
+  wireSeg("timeSeg", "secs", function (v) { game.secs = v; });
+  wireSeg("roundSeg", "rounds", function (v) { game.roundsPerTeam = v; });
+
+  function showPanel(which) {
+    document.getElementById("gameSetup").style.display = which === "setup" ? "block" : "none";
+    document.getElementById("gameLive").style.display = which === "live" ? "block" : "none";
+    document.getElementById("gameBreak").style.display = which === "break" ? "block" : "none";
+  }
+
+  function renderScores() {
+    [0, 1].forEach(function (i) {
+      var el = document.getElementById(i === 0 ? "teamA" : "teamB");
+      el.querySelector(".tscore").textContent = game.scores[i];
+      el.classList.toggle("turn", game.turn === i);
+    });
+  }
+
+  function renderStageCard() {
+    var stage = document.getElementById("stage");
+    stage.innerHTML = "";
+    if (liveCardEntry) stage.appendChild(cardEl(liveCardEntry, game.order[game.pos] + 1));
+  }
+
+  function nextCard() {
+    game.pos = (game.pos + 1) % game.order.length;
+    liveCardEntry = DECK[game.order[game.pos]];
+    renderStageCard();
+  }
+
+  function beep(freq, dur) {
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!beep.ctx) beep.ctx = new Ctx();
+      var o = beep.ctx.createOscillator(), g = beep.ctx.createGain();
+      o.frequency.value = freq; o.type = "sine";
+      g.gain.setValueAtTime(0.12, beep.ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, beep.ctx.currentTime + dur);
+      o.connect(g); g.connect(beep.ctx.destination);
+      o.start(); o.stop(beep.ctx.currentTime + dur);
+    } catch (e) {}
+  }
+
+  function startTurn() {
+    game.turnGot = 0; game.turnPass = 0;
+    game.order = shuffle(DECK.map(function (_, i) { return i; }));
+    game.pos = -1;
+    nextCard();
+    renderScores();
+    document.getElementById("turnBannerLive").innerHTML =
+      "<b>" + TEAM_NAMES[game.turn] + "</b> acts · round " + (game.roundsDone[game.turn] + 1) + " of " + game.roundsPerTeam;
+    showPanel("live");
+    game.deadline = Date.now() + game.secs * 1000;
+    clearInterval(game.timer);
+    game.timer = setInterval(tick, 250);
+    tick();
+  }
+
+  function tick() {
+    var left = Math.max(0, (game.deadline - Date.now()) / 1000);
+    var fill = document.getElementById("timerFill");
+    fill.style.width = (left / game.secs * 100) + "%";
+    fill.classList.toggle("low", left <= 10);
+    document.getElementById("timerText").textContent = Math.ceil(left);
+    if (left <= 0) endTurn();
+  }
+
+  function endTurn() {
+    clearInterval(game.timer);
+    beep(196, 0.5); setTimeout(function () { beep(147, 0.7); }, 250);
+    game.roundsDone[game.turn]++;
+    var recapName = TEAM_NAMES[game.turn];
+    var done = game.roundsDone[0] >= game.roundsPerTeam && game.roundsDone[1] >= game.roundsPerTeam;
+    document.getElementById("roundRecap").textContent =
+      recapName + " scored " + game.turnGot + " this round (" + game.turnPass + " passed). " +
+      (game.turnGot === 0 ? "The court avert their eyes." : game.turnGot >= 5 ? "The court is on its feet." : "The court nods politely.");
+    if (done) {
+      var a = game.scores[0], b = game.scores[1];
+      document.getElementById("breakTitle").textContent =
+        a === b ? "A draw. How diplomatic." :
+        (a > b ? TEAM_NAMES[0] : TEAM_NAMES[1]) + " takes the parlour, " + Math.max(a, b) + "–" + Math.min(a, b) + ".";
+      document.getElementById("breakBtn").textContent = "Rematch →";
+      document.getElementById("breakBtn").onclick = resetGame;
+    } else {
+      game.turn = 1 - game.turn;
+      document.getElementById("breakTitle").textContent = "Hand the phone to " + TEAM_NAMES[game.turn] + ".";
+      document.getElementById("breakBtn").textContent = TEAM_NAMES[game.turn] + ", begin →";
+      document.getElementById("breakBtn").onclick = startTurn;
+    }
+    showPanel("break");
+  }
+
+  function resetGame() {
+    game.scores = [0, 0]; game.roundsDone = [0, 0]; game.turn = 0;
+    liveCardEntry = null;
+    showPanel("setup");
+  }
+
+  document.getElementById("startGameBtn").addEventListener("click", function () {
+    game.scores = [0, 0]; game.roundsDone = [0, 0]; game.turn = 0;
+    startTurn();
+  });
+  document.getElementById("gotBtn").addEventListener("click", function () {
+    game.scores[game.turn]++; game.turnGot++;
+    beep(660, 0.12);
+    renderScores();
+    nextCard();
+  });
+  document.getElementById("passBtn").addEventListener("click", function () {
+    game.turnPass++;
+    nextCard();
+  });
+  document.getElementById("resetBtn").addEventListener("click", resetGame);
+  document.addEventListener("keydown", function (e) {
+    if (document.getElementById("gameLive").style.display === "none") return;
+    if (e.key === "g" || e.key === "G") document.getElementById("gotBtn").click();
+    if (e.key === "p" || e.key === "P") document.getElementById("passBtn").click();
+  });
+
+  /* ---------------- Printed deck (prototype checkout) ---------------- */
+  document.getElementById("deckBtn").addEventListener("click", function () {
+    document.getElementById("deckNote").style.display = "block";
+    this.textContent = "✓ Reserved in the ledger";
+    this.disabled = true;
+    if (window.ttq) try { ttq.track("AddToCart", { content_name: "parlour-deck" }); } catch (e) {}
+    if (window.fbq) try { fbq("track", "AddToCart", { content_name: "parlour-deck" }); } catch (e) {}
+  });
+
+  renderFan();
+  renderDeckStack();
+})();
+</script>
+
+</body>
+</html>
