@@ -252,7 +252,7 @@
     <div class="qnum">The Parlour Deck · Party Games Division · Also Him</div>
     <h1>Charades.<br>Every card is their face.</h1>
     <p class="lede">
-      Fifty-four charades cards. One recurring subject. Upload a photo of your favorite idiot and
+      Fifty-four charades cards. One recurring subject. Upload a photo of your favorite face and
       every prompt becomes about <em>them</em> — acted out by people who love them and are
       currently screaming <em>"WEDDING! DANCING! IT'S DAVE AT THE WEDDING!"</em>
     </p>
@@ -539,7 +539,7 @@
     stageBtn.style.display = state.photo ? "inline-flex" : "none";
     stageBtn.disabled = false;
     var unstaged = fanPicks.filter(function (i) { return !sceneCache[DECK[i][2]]; }).length;
-    stageBtn.textContent = unstaged ? "🎭 Paint them into these scenes (~30s each)" : "✓ Scenes staged — deal new cards for more";
+    stageBtn.textContent = unstaged ? "🎭 Paint them into these scenes (~30s, all at once)" : "✓ Scenes staged — deal new cards for more";
     if (!unstaged && state.photo) stageBtn.disabled = true;
   }
   function stageScene(entry) {
@@ -561,20 +561,21 @@
     stageBtn.disabled = true;
     stageNote.textContent = "";
     document.getElementById("gateBox").style.display = "none";
-    var idx = 0;
-    (function next() {
-      if (idx >= entries.length) { resetStageBtn(); stageNote.textContent = "Staged. Hover them. You're welcome."; return; }
-      stageBtn.textContent = "🎨 Staging scene " + (idx + 1) + " of " + entries.length + "… (~30s)";
-      stageScene(entries[idx]).then(function () { idx++; next(); }).catch(function (e) {
-        resetStageBtn();
-        if (e.code === 402) {
-          document.getElementById("gateBox").style.display = "block";
-          document.getElementById("gateEmail").focus();
-        } else {
-          stageNote.textContent = "😔 The atelier hiccuped: " + e.message;
-        }
-      });
-    })();
+    stageBtn.textContent = entries.length === 1
+      ? "🎨 Staging the scene… (~30s)"
+      : "🎨 Staging all " + entries.length + " scenes at once… (~30s)";
+    Promise.allSettled(entries.map(stageScene)).then(function (results) {
+      resetStageBtn();
+      var failures = results.filter(function (r) { return r.status === "rejected"; });
+      if (!failures.length) { stageNote.textContent = "Staged. Hover them. You're welcome."; return; }
+      var gated = failures.some(function (r) { return r.reason && r.reason.code === 402; });
+      if (gated) {
+        document.getElementById("gateBox").style.display = "block";
+        document.getElementById("gateEmail").focus();
+      } else {
+        stageNote.textContent = "😔 The atelier hiccuped: " + failures[0].reason.message;
+      }
+    });
   }
   stageBtn.addEventListener("click", stageAll);
   document.getElementById("gateBtn").addEventListener("click", function () {
