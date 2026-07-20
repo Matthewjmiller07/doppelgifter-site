@@ -380,13 +380,12 @@
           family heirloom and plays like a roast.
         </p>
         <p class="price">$24.99 <s>$29.99</s></p>
-        <p class="hint">Printed &amp; shipped by Printify · tuck box inscription included</p>
+        <p class="hint">Printed &amp; shipped by Printify · tuck box inscription included · $4.99 standard shipping at checkout</p>
         <div class="actions">
           <button class="btn" id="deckBtn">Reserve their deck →</button>
           <a class="btn ghost" href="index.html">Or start with a mug</a>
         </div>
-        <p id="deckNote">🎉 Noted in the ledger. This is the prototype — no card was harmed.
-          In production this is Stripe Checkout → webhook → Printify's playing-card line. You play; the presses roll.</p>
+        <p id="deckNote"></p>
       </div>
     </div>
   </section>
@@ -814,13 +813,59 @@
     if (e.key === "p" || e.key === "P") document.getElementById("passBtn").click();
   });
 
-  /* ---------------- Printed deck (prototype checkout) ---------------- */
+  /* ---------------- Printed deck (real Stripe checkout) ---------------- */
+  function deckArtUrl() {
+    // Best available hosted artwork: a staged scene beats the painted portrait
+    // beats the demo gentleman. Checkout requires an https print file.
+    for (var k in sceneCache) if (sceneCache[k]) return sceneCache[k];
+    if (typeof state.face === "string") {
+      if (state.face.indexOf("https://") === 0) return state.face;
+      if (state.face.indexOf("data:") !== 0) {
+        try { return new URL(state.face, location.href).href; } catch (e) {}
+      }
+    }
+    return null;
+  }
   document.getElementById("deckBtn").addEventListener("click", function () {
-    document.getElementById("deckNote").style.display = "block";
-    this.textContent = "✓ Reserved in the ledger";
-    this.disabled = true;
-    if (window.ttq) try { ttq.track("AddToCart", { content_name: "parlour-deck" }); } catch (e) {}
-    if (window.fbq) try { fbq("track", "AddToCart", { content_name: "parlour-deck" }); } catch (e) {}
+    var btn = this, note = document.getElementById("deckNote");
+    var art = deckArtUrl();
+    if (!art || art.indexOf("https://") !== 0) {
+      note.style.display = "block";
+      note.textContent = "🎨 Give the presses something to print first: paint them Renaissance (Step I) or stage a scene (Step II), then reserve.";
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = "Summoning the cashier…";
+    note.style.display = "none";
+    if (window.ttq) try { ttq.track("InitiateCheckout", { content_name: "parlour-deck" }); } catch (e) {}
+    if (window.fbq) try { fbq("track", "InitiateCheckout", { content_name: "parlour-deck" }); } catch (e) {}
+    var subject = (document.getElementById("nameInput").value || "").trim();
+    var body = {
+      product: "deck",
+      style: subject ? "Parlour Deck — starring " + subject : "Parlour Deck",
+      art_url: art,
+      preview_url: art,
+      session_key: SKEY
+    };
+    try { if (localStorage.dgEmail) body.email = localStorage.dgEmail; } catch (e) {}
+    if (/utm_/.test(location.search)) body.utm = location.search.slice(1, 450);
+    fetch(CONFIG.url + "/functions/v1/dg-checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
+      body: JSON.stringify(body)
+    }).then(function (res) {
+      return res.json().then(function (d) {
+        if (!res.ok) throw new Error(d.error || ("HTTP " + res.status));
+        return d;
+      });
+    }).then(function (d) {
+      location.href = d.url;
+    }).catch(function (e) {
+      btn.disabled = false;
+      btn.textContent = "Reserve their deck →";
+      note.style.display = "block";
+      note.textContent = "😔 The cashier stepped away: " + e.message + " — try again in a moment.";
+    });
   });
 
   renderFan();
