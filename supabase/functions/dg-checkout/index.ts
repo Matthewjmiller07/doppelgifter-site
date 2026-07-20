@@ -6,6 +6,7 @@ const PRICES: Record<string, { cents: number; name: string }> = {
   blanket: { cents: 6499, name: "The Heirloom Blanket" },
   poster: { cents: 4499, name: "The Gallery Poster" },
   deck: { cents: 2499, name: "The Parlour Deck (54 cards)" },
+  cards: { cents: 2499, name: "The Parlour Deck (54 cards)" }, // homepage alias for deck
 };
 const DIGITAL_CENTS = 999;
 const SHIPPING_CENTS = 499;

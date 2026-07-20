@@ -261,6 +261,23 @@
   #pillText { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
   #pillBar { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; border-radius: 0 0 10px 10px; overflow: hidden; }
   #pillBarFill { height: 100%; width: 0%; background: var(--gilt-bright); transition: width 0.5s linear; }
+
+  /* Parlour Deck pitch (shown when the deck is the chosen vessel) */
+  #deckPitch { display: none; margin-top: 26px; }
+  .pcardrow { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .pcard {
+    width: 152px; background: var(--ground-raise); border: 2px solid var(--frame-outer);
+    outline: 1px solid var(--frame-inner); outline-offset: -5px; border-radius: 10px;
+    padding: 12px 10px 10px; box-shadow: var(--shadow); text-align: center;
+  }
+  .pcard:first-child { transform: rotate(-4deg); }
+  .pcard:last-child { transform: rotate(4deg); }
+  .pcard .pcat { display: block; font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--seal); font-weight: 700; margin-bottom: 8px; }
+  .pcard img { width: 76px; height: 94px; object-fit: cover; border-radius: 50% / 42%; border: 2px solid var(--gilt); display: block; margin: 0 auto 8px; }
+  .pcard .pprompt { display: block; font-family: "Palatino", "Iowan Old Style", "Book Antiqua", Georgia, serif; font-size: 13.5px; line-height: 1.25; min-height: 3.4em; }
+  .pcard .pnum { display: block; font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); margin-top: 6px; }
+  #deckPitch .pitchcopy { text-align: center; max-width: 56ch; margin: 18px auto 0; font-size: 14.5px; color: var(--ink-soft); }
+  #deckPitch .pitchcopy b, #deckPitch .pitchcopy em { color: var(--ink); }
 </style>
 
 <div id="progress"><div id="progressFill"></div></div>
@@ -402,14 +419,41 @@
       </button>
       <button class="choice" data-gift="The Parlour Deck" data-price="24.99">
         <span class="giftglyph">🃏</span>
-        <span class="cname">The Parlour Deck <span class="price"><s style="opacity:.55;font-weight:500;margin-right:4px;">$29.99</s>$24.99</span></span>
-        <span class="cdesc">54 cards, linen finish, custom tuck box. A true parlour game.</span>
+        <span class="cname">The Parlour Deck · Custom Charades <span class="price"><s style="opacity:.55;font-weight:500;margin-right:4px;">$29.99</s>$24.99</span></span>
+        <span class="cdesc">A charades game where every card stars their face. 54 scenes of them, linen finish, gilt tuck box.</span>
       </button>
     </div>
     <div id="livePrev4" style="display:none; margin-top:24px; max-width:230px; position:relative;">
       <img class="framed" id="prev4Img" alt="Live product mockup" style="aspect-ratio:1/1; object-fit:cover;">
       <div class="veil" id="veilPrev4"><div class="ring"></div><div class="veilText">Pressing…</div></div>
       <span class="plaque">On the goods — live</span>
+    </div>
+    <div id="deckPitch">
+      <div class="pcardrow" aria-hidden="true">
+        <div class="pcard">
+          <span class="pcat">Acts of Nobility</span>
+          <img src="demo/renaissance-art.png" alt="">
+          <span class="pprompt">Dave knighting a confused pigeon</span>
+          <span class="pnum">Doppelgifter Parlour Deck · No. 2 of 54</span>
+        </div>
+        <div class="pcard">
+          <span class="pcat">Domestic Tragedies</span>
+          <img src="demo/renaissance-art.png" alt="">
+          <span class="pprompt">Dave discovering the milk is empty</span>
+          <span class="pnum">Doppelgifter Parlour Deck · No. 19 of 54</span>
+        </div>
+        <div class="pcard">
+          <span class="pcat">Feats of Celebration</span>
+          <img src="demo/renaissance-art.png" alt="">
+          <span class="pprompt">Dave dancing at a wedding</span>
+          <span class="pnum">Doppelgifter Parlour Deck · No. 38 of 54</span>
+        </div>
+      </div>
+      <p class="pitchcopy"><b>How it plays:</b> draw a card, act out the scene, say absolutely nothing. Your loved ones
+        scream <em>"DAVE!"</em> at escalating volume until someone names the deed. Most cards by the end of the
+        evening wins the tuck box; everyone else claims they weren't really trying.</p>
+      <p class="pitchcopy">All 54 cards are painted with <b>their</b> face — a different scene of them on every single card.
+        <a href="charades.html" style="color:var(--gilt); font-weight:650;">Preview the full deck &amp; play a free round →</a></p>
     </div>
     <div class="actions">
       <button class="btn" data-next id="giftNext" disabled>To the treasury →</button>
@@ -629,6 +673,7 @@
   wireGrid("giftGrid", "giftNext", function (c) {
     state.gift = c.dataset.gift;
     state.price = parseFloat(c.dataset.price);
+    document.getElementById("deckPitch").style.display = state.gift === "The Parlour Deck" ? "block" : "none";
     var box = document.getElementById("livePrev4");
     var giftKey = GIFT_KEYS[state.gift];
     box.style.display = "block";

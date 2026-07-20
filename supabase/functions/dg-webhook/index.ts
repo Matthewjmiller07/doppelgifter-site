@@ -12,6 +12,7 @@ const PRODUCT_NAMES: Record<string, string> = {
   blanket: "The Heirloom Blanket",
   poster: "The Gallery Poster",
   deck: "The Parlour Deck (54 cards)",
+  cards: "The Parlour Deck (54 cards)", // homepage alias for deck
 };
 const PRODUCT_QUIPS: Record<string, string> = {
   mug: "a machine is now solemnly applying their face to 11 ounces of premium ceramic",
@@ -19,6 +20,7 @@ const PRODUCT_QUIPS: Record<string, string> = {
   blanket: "their face is being woven into 50×60 inches of fleece, edge to edge, no escape",
   poster: "their portrait is being pressed onto museum-grade matte paper, frame-ready",
   deck: "fifty-four linen-finish cards are being dealt their face, one solemn scene at a time",
+  cards: "fifty-four linen-finish cards are being dealt their face, one solemn scene at a time",
 };
 
 async function verifySignature(payload: string, header: string, secret: string): Promise<boolean> {
