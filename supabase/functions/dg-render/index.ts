@@ -25,6 +25,7 @@ const AI_MOCKUPS: Record<string, string> = {
   tee: "Professional e-commerce product photograph of a white unisex t-shirt on an invisible mannequin against a clean light studio background. The artwork in image 1 is printed large on the chest. Preserve any caption text exactly. Sharp focus, no added text.",
   poster: "Professional interior photograph of an 18x24 inch matte poster on a warm neutral wall showing the artwork from image 1, preserving any caption text exactly. Sharp focus, no added text.",
   blanket: "Professional lifestyle product photograph of a soft plush blanket draped over a sofa, printed with the artwork from image 1, preserving any caption text exactly. Sharp focus, no added text.",
+  cards: "Professional product photography of a custom playing card deck on a neutral background, showing both the tuck box and several spread cards featuring the portrait from image 1 on their backs. Sharp focus, clean studio lighting.",
 };
 
 const PRINTIFY_CFG: Record<string, { blueprint: number; provider: number; variant: number; scale: number; price: number }> = {
@@ -32,6 +33,7 @@ const PRINTIFY_CFG: Record<string, { blueprint: number; provider: number; varian
   tee: { blueprint: 6, provider: 29, variant: 12100, scale: 1.0, price: 3499 },
   blanket: { blueprint: 522, provider: 1, variant: 68323, scale: 1.0, price: 6499 },
   poster: { blueprint: 282, provider: 99, variant: 43144, scale: 1.0, price: 4499 },
+  cards: { blueprint: 1138, provider: 28, variant: 87236, scale: 1.0, price: 2499 },
 };
 
 const CORS = {

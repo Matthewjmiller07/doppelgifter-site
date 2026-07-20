@@ -400,6 +400,11 @@
         <span class="cname">The Gallery Poster <span class="price"><s style="opacity:.55;font-weight:500;margin-right:4px;">$59.99</s>$44.99</span></span>
         <span class="cdesc">18×24", museum matte. Hang it where guests must confront it.</span>
       </button>
+      <button class="choice" data-gift="The Parlour Deck" data-price="24.99">
+        <span class="giftglyph">🃏</span>
+        <span class="cname">The Parlour Deck <span class="price"><s style="opacity:.55;font-weight:500;margin-right:4px;">$29.99</s>$24.99</span></span>
+        <span class="cdesc">54 cards, linen finish, custom tuck box. A true parlour game.</span>
+      </button>
     </div>
     <div id="livePrev4" style="display:none; margin-top:24px; max-width:230px; position:relative;">
       <img class="framed" id="prev4Img" alt="Live product mockup" style="aspect-ratio:1/1; object-fit:cover;">
@@ -577,7 +582,7 @@
       if (!d.gift) throw new Error(d.error || "riddles");
       state.witty = d;
       state.wittyGiftKey = d.gift.product;
-      var names = { mug: "☕ The Ceremonial Mug", tee: "👕 The Monument Tee", blanket: "🛋️ The Heirloom Blanket", poster: "🖼️ The Gallery Poster" };
+      var names = { mug: "☕ The Ceremonial Mug", tee: "👕 The Monument Tee", blanket: "🛋️ The Heirloom Blanket", poster: "🖼️ The Gallery Poster", cards: "🃏 The Parlour Deck" };
       finish([(names[d.gift.product] || d.gift.product) + " — " + d.gift.reason + " (we\u2019ll preselect it)"]);
     }).catch(function () { finish(keywordHits(t)); });
   });
@@ -658,7 +663,7 @@
     var ship = 4.99;
     var dig = document.getElementById("digitalUp").checked ? 9.99 : 0;
     var rev = Math.max(0.5, state.price + ship + dig - (state.promoOff || 0));
-    var cogsRate = { "The Ceremonial Mug": 10.13, "The Monument Tee": 13.40, "The Heirloom Blanket": 22.05, "The Gallery Poster": 12.80 };
+    var cogsRate = { "The Ceremonial Mug": 10.13, "The Monument Tee": 13.40, "The Heirloom Blanket": 22.05, "The Gallery Poster": 12.80, "The Parlour Deck": 14.50 };
     var cogs = cogsRate[state.gift] || 11;
     var stripe = rev * 0.029 + 0.30;
     var profit = rev - cogs - 0.04 - stripe;
@@ -685,10 +690,10 @@
   var urlPromo = null;
   try { urlPromo = new URLSearchParams(location.search).get("code"); } catch (e) {}
   var STYLE_KEYS = { "The Renaissance Noble": "renaissance", "The Saturday Cartoon": "cartoon", "The '85 Glamour Shot": "glamour", "The Marble Bust": "marble" };
-  var GIFT_KEYS = { "The Ceremonial Mug": "mug", "The Monument Tee": "tee", "The Heirloom Blanket": "blanket", "The Gallery Poster": "poster" };
+  var GIFT_KEYS = { "The Ceremonial Mug": "mug", "The Monument Tee": "tee", "The Heirloom Blanket": "blanket", "The Gallery Poster": "poster", "The Parlour Deck": "cards" };
   var artPromise = null, artStyle = null, mockCache = {}, mockPromises = {}, lastArt = null;
-  var DEMO_MOCKS = { mug: "demo/mug.jpg", tee: "demo/tee.jpg", poster: "demo/poster.jpg", blanket: "demo/blanket.jpg" };
-  var GIFT_NAMES = { mug: "The Ceremonial Mug", tee: "The Monument Tee", blanket: "The Heirloom Blanket", poster: "The Gallery Poster" };
+  var DEMO_MOCKS = { mug: "demo/mug.jpg", tee: "demo/tee.jpg", poster: "demo/poster.jpg", blanket: "demo/blanket.jpg", cards: "demo/cards.jpg" };
+  var GIFT_NAMES = { mug: "The Ceremonial Mug", tee: "The Monument Tee", blanket: "The Heirloom Blanket", poster: "The Gallery Poster", cards: "The Parlour Deck" };
   var DEMO_ART = "demo/renaissance-art.png";
   function absUrl(p) { return new URL(p, location.href).href; }
 
