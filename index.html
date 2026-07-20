@@ -498,6 +498,17 @@
         <p class="lede" style="margin-bottom: 8px;" id="summaryLine">One <b>Ceremonial Mug</b>, bearing their likeness in the style of <b>The Renaissance Noble</b>.</p>
         <p class="okline">Final 300-DPI render happens only after payment clears — previews cost us pennies, masterpieces cost us slightly more pennies.</p>
         <p class="okline" id="renderStatus" style="display:none; font-weight:600;"></p>
+        <div id="deckWait" style="display:none; margin:16px 0; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--ground-raise);">
+          <p class="okline" style="margin:0 0 10px;"><b>While their portrait dries</b> — a taste of game night:</p>
+          <div style="display:flex; gap:14px; align-items:center;">
+            <img id="waitCardImg" src="demo/pitch-knight.jpg" alt="" style="width:76px; height:94px; object-fit:cover; border-radius:50% / 42%; border:2px solid var(--gilt); display:block; flex:none;">
+            <div style="flex:1; min-width:0;">
+              <p id="waitCardPrompt" style="font-family:'Palatino','Iowan Old Style','Book Antiqua',Georgia,serif; font-size:15px; margin:0 0 8px; line-height:1.25;">Dave knighting a confused pigeon</p>
+              <button class="btn ghost" id="waitNextBtn" type="button" style="padding:7px 14px; font-size:13px; border:1px solid var(--line); border-radius:4px; background:transparent; color:var(--ink); cursor:pointer; font-family:inherit;">Next card →</button>
+            </div>
+          </div>
+          <p class="okline" style="margin:10px 0 0;"><a href="charades.html" style="color:var(--gilt); font-weight:650;">Or play a full free round right now →</a></p>
+        </div>
         <div id="emailGate" style="display:none; margin-top:14px;">
           <p class="okline" style="margin:0 0 8px;"><b>The first masterpiece was on the house.</b> Leave your email once — this device is remembered — and the atelier keeps painting, plus the occasional dangerously good gift idea in your inbox.</p>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -725,14 +736,29 @@
     var ship = 4.99;
     var dig = document.getElementById("digitalUp").checked ? 9.99 : 0;
     var rev = Math.max(0.5, state.price + ship + dig - (state.promoOff || 0));
-    var cogsRate = { "The Ceremonial Mug": 10.13, "The Monument Tee": 13.40, "The Heirloom Blanket": 22.05, "The Gallery Poster": 12.80, "The Parlour Deck": 14.50 };
+    var cogsRate = { "The Ceremonial Mug": 10.13, "The Monument Tee": 13.40, "The Heirloom Blanket": 22.05, "The Gallery Poster": 12.80, "The Parlour Deck": 13.69 };
     var cogs = cogsRate[state.gift] || 11;
     var stripe = rev * 0.029 + 0.30;
     var profit = rev - cogs - 0.04 - stripe;
     var fmt = function (n) { return "$" + n.toFixed(2); };
     document.getElementById("payPrice").textContent = fmt(rev);
+    document.getElementById("deckWait").style.display = state.gift === "The Parlour Deck" ? "block" : "none";
+    if (state.gift === "The Parlour Deck") showWaitCard(0);
     liveRender();
   }
+  var WAIT_SCENES = [
+    { key: "solemnly knighting a confused pigeon with a sword", prompt: "Dave knighting a confused pigeon", demo: "demo/pitch-knight.jpg" },
+    { key: "pouring from an empty milk jug over cereal, betrayed expression", prompt: "Dave discovering the milk is empty mid-pour", demo: "demo/pitch-milk.jpg" },
+    { key: "dancing exuberantly at a wedding, arms flailing", prompt: "Dave dancing at a wedding", demo: "demo/pitch-wedding.jpg" }
+  ];
+  var waitIdx = 0;
+  function showWaitCard(i) {
+    waitIdx = ((i % WAIT_SCENES.length) + WAIT_SCENES.length) % WAIT_SCENES.length;
+    var s = WAIT_SCENES[waitIdx];
+    document.getElementById("waitCardImg").src = (pitchCache && pitchCache[s.key]) || s.demo;
+    document.getElementById("waitCardPrompt").textContent = s.prompt;
+  }
+  document.getElementById("waitNextBtn").addEventListener("click", function () { showWaitCard(waitIdx + 1); });
   /* ---- Live rendering via Supabase edge function ---- */
   var CONFIG = {
     url: "https://knbyyykfwwlgnizutqyb.supabase.co",
