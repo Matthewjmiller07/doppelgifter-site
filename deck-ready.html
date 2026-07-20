@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Their full deck — DoppelGifter</title>
+<style>
+  :root {
+    --ground: #F5F1E6; --ground-raise: #FDFBF4; --ink: #1E3329; --ink-soft: #52655B;
+    --line: #D8D0BC; --gilt: #A87F1F; --gilt-bright: #C8A028; --seal: #B03A2E;
+    --frame-outer: #8A6914; --frame-inner: #E4C158;
+    --shadow: 0 2px 14px rgba(30, 51, 41, 0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --ground:#142720; --ground-raise:#1C332A; --ink:#EDE6D3; --ink-soft:#9FB0A4;
+      --line:#2E4A3D; --gilt:#C8A028; --gilt-bright:#DDBA4A; --seal:#C4483B;
+      --frame-outer:#8A6914; --frame-inner:#C8A028; --shadow:0 2px 18px rgba(0,0,0,.35); }
+  }
+  :root[data-theme="dark"] { --ground:#142720; --ground-raise:#1C332A; --ink:#EDE6D3; --ink-soft:#9FB0A4;
+    --line:#2E4A3D; --gilt:#C8A028; --gilt-bright:#DDBA4A; --seal:#C4483B;
+    --frame-outer:#8A6914; --frame-inner:#C8A028; --shadow:0 2px 18px rgba(0,0,0,.35); }
+  :root[data-theme="light"] { --ground:#F5F1E6; --ground-raise:#FDFBF4; --ink:#1E3329; --ink-soft:#52655B;
+    --line:#D8D0BC; --gilt:#A87F1F; --gilt-bright:#C8A028; --seal:#B03A2E;
+    --frame-outer:#8A6914; --frame-inner:#E4C158; --shadow:0 2px 14px rgba(30,51,41,.10); }
+
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--ground); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; line-height:1.55; }
+  main { max-width: 1000px; margin: 0 auto; padding: 48px 24px 80px; }
+  #brandbar { text-align:center; margin-bottom: 28px; }
+  #brandbar a { font-size:12px; letter-spacing:.22em; text-transform:uppercase; color:var(--ink-soft); font-weight:650; text-decoration:none; }
+  #brandbar b { color:var(--gilt); }
+  h1 { font-family:"Palatino","Iowan Old Style","Book Antiqua",Georgia,serif; font-weight:500;
+    font-size: clamp(28px, 5vw, 42px); text-align:center; margin: 0 0 10px; text-wrap:balance; }
+  .lede { text-align:center; color:var(--ink-soft); max-width:56ch; margin:0 auto 36px; font-size:15.5px; }
+  .lede b { color: var(--ink); }
+
+  #stateBox { text-align:center; padding: 40px 20px; }
+  .ring { width:38px; height:38px; margin:0 auto 16px; border-radius:50%;
+    border:4px solid color-mix(in srgb, var(--gilt) 25%, transparent); border-top-color:var(--gilt);
+    animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .ring { animation: none; } }
+  #progressNote { color:var(--ink-soft); font-size:14.5px; }
+
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 18px; }
+  .card { background:var(--ground-raise); border:2px solid var(--frame-outer); outline:1px solid var(--frame-inner);
+    outline-offset:-5px; border-radius:10px; overflow:hidden; box-shadow:var(--shadow); }
+  .card img { width:100%; aspect-ratio:2/3; object-fit:cover; display:block; }
+  .card .meta { padding: 10px 12px 12px; }
+  .card .cat { font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--seal); font-weight:700; }
+  .card .prompt { font-family:"Palatino","Iowan Old Style",Georgia,serif; font-size:13.5px; margin-top:4px; line-height:1.25; }
+
+  .note { max-width:60ch; margin: 36px auto 0; font-size:13.5px; color:var(--ink-soft); text-align:center; }
+  .note b { color: var(--ink); }
+  .cta { text-align:center; margin-top: 28px; }
+  .cta a { display:inline-block; background:var(--seal); color:#fff; text-decoration:none; font-weight:650;
+    padding:13px 26px; border-radius:8px; box-shadow:var(--shadow); }
+</style>
+</head>
+<body>
+<main>
+  <div id="brandbar"><a href="index.html">Doppel<b>Gifter</b> · Fine Commemorative Goods</a></div>
+  <h1>Their full deck.</h1>
+  <p class="lede" id="ledeText">Loading the gallery for order <span id="orderRef"></span>…</p>
+
+  <div id="stateBox">
+    <div class="ring"></div>
+    <p id="progressNote">Fetching your order…</p>
+  </div>
+
+  <div class="grid" id="grid" style="display:none;"></div>
+  <p class="note" id="printNote" style="display:none;"><b>Worth knowing:</b> playing-card printing puts one design on the back of every card — that's how the physical deck's presses work. The printed deck carries your favorite scene from this gallery; this page is the full digital keepsake, every scene.</p>
+  <div class="cta" id="ctaRow" style="display:none;">
+    <a href="charades.html">Play a free round with someone else →</a>
+  </div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var CONFIG = {
+    url: "https://knbyyykfwwlgnizutqyb.supabase.co",
+    anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuYnl5eWtmd3dsZ25penV0cXliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4MjI3MDMsImV4cCI6MjA5NjM5ODcwM30.xbArp2d_jbD28dqg5ZdjgmaqKJ6erbTtVzMv22TDsxg"
+  };
+  var orderId = new URLSearchParams(location.search).get("order") || "";
+  document.getElementById("orderRef").textContent = orderId ? orderId.slice(0, 8).toUpperCase() : "—";
+
+  function renderGrid(cards) {
+    var grid = document.getElementById("grid");
+    grid.innerHTML = "";
+    cards.forEach(function (c) {
+      var d = document.createElement("div");
+      d.className = "card";
+      d.innerHTML = '<img src="' + c.art_url + '" alt="' + (c.prompt || "").replace(/"/g, "&quot;") + '" loading="lazy">' +
+        '<div class="meta"><div class="cat">' + (c.category || "") + '</div><div class="prompt">' + (c.prompt || "") + "</div></div>";
+      grid.appendChild(d);
+    });
+    grid.style.display = cards.length ? "grid" : "none";
+  }
+
+  function poll() {
+    if (!orderId) {
+      document.getElementById("progressNote").textContent = "No order in the link — check the email again.";
+      return;
+    }
+    fetch(CONFIG.url + "/functions/v1/dg-checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
+      body: JSON.stringify({ lookup_order_id: orderId })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.error) {
+        document.getElementById("progressNote").textContent = "Couldn't find that order. Check the link from your email.";
+        return;
+      }
+      var cards = Array.isArray(d.deck_art) ? d.deck_art : [];
+      renderGrid(cards);
+
+      if (d.deck_status === "ready" || d.deck_status === "partial") {
+        document.getElementById("stateBox").style.display = "none";
+        document.getElementById("ledeText").innerHTML = cards.length + " scenes of them, painted one at a time. <b>Play with them any time</b> at the free web game, or hang your favorite.";
+        document.getElementById("printNote").style.display = "block";
+        document.getElementById("ctaRow").style.display = "block";
+        return;
+      }
+      if (d.deck_status === "failed") {
+        document.getElementById("stateBox").querySelector(".ring").style.display = "none";
+        document.getElementById("progressNote").textContent = "The atelier's easel jammed partway through. Reply to your confirmation email and we'll sort it by hand.";
+        return;
+      }
+      // still rendering — show whatever has landed so far, keep polling
+      document.getElementById("progressNote").textContent =
+        cards.length ? (cards.length + " of 48 scenes painted so far…") : "The atelier is warming up its brushes…";
+      setTimeout(poll, 5000);
+    }).catch(function () {
+      document.getElementById("progressNote").textContent = "Couldn't reach the atelier. Retrying…";
+      setTimeout(poll, 8000);
+    });
+  }
+  poll();
+})();
+</script>
+</body>
+</html>

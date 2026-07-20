@@ -847,6 +847,11 @@
       preview_url: art,
       session_key: SKEY
     };
+    // The full 48-scene deck renders after purchase (see dg-webhook) from their
+    // actual face photo, not just this one staged/painted preview.
+    if (typeof state.photo === "string" && state.photo.indexOf("data:image/") === 0) {
+      body.photo = state.photo;
+    }
     try { if (localStorage.dgEmail) body.email = localStorage.dgEmail; } catch (e) {}
     if (/utm_/.test(location.search)) body.utm = location.search.slice(1, 450);
     fetch(CONFIG.url + "/functions/v1/dg-checkout", {

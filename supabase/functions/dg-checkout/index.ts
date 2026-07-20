@@ -8,9 +8,12 @@ const PRICES: Record<string, { cents: number; name: string }> = {
   deck: { cents: 2499, name: "The Parlour Deck (54 cards)" },
   cards: { cents: 2499, name: "The Parlour Deck (54 cards)" }, // homepage alias for deck
 };
+// Products whose fulfillment renders a full personalized deck after purchase (see dg-webhook).
+const DECK_PRODUCTS = new Set(["deck", "cards"]);
 const DIGITAL_CENTS = 999;
 const SHIPPING_CENTS = 499;
 const SITE = "https://doppelgifter.com";
+const MAX_PHOTO_B64 = 2_500_000; // matches dg-render's cap
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -49,6 +52,22 @@ async function lookupPromo(sk: string, code: string) {
   return { id: pc.id, code: pc.code, amountOff, percentOff };
 }
 
+// Stores a client-supplied "photo" data URL (data:image/...;base64,....) in the dg-art
+// bucket so the webhook can render the full personalized deck after payment clears.
+// Returns a public https URL, or null if the input isn't a well-formed small data URL.
+async function persistDataUrl(supabase: any, dataUrl: string, orderId: string): Promise<string | null> {
+  const m = /^data:image\/(png|jpe?g|webp);base64,(.+)$/.exec(dataUrl);
+  if (!m) return null;
+  const ext = m[1] === "jpg" ? "jpeg" : m[1];
+  const bytes = Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0));
+  const path = `${orderId}/source-photo.${ext}`;
+  const { error } = await supabase.storage
+    .from("dg-art")
+    .upload(path, bytes, { contentType: `image/${ext}`, upsert: true });
+  if (error) return null;
+  return supabase.storage.from("dg-art").getPublicUrl(path).data.publicUrl;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
@@ -75,6 +94,19 @@ Deno.serve(async (req: Request) => {
     return json(order);
   }
 
+  // Order id is an unguessable UUID handed back only to the buyer's own browser
+  // (checkout response / confirmation email), so this is safe without a login,
+  // same trust model as the stripe_session_id lookup above.
+  if (typeof body.lookup_order_id === "string") {
+    const { data: order } = await supabase
+      .from("dg_orders")
+      .select("product, style, preview_url, status, deck_status, deck_art, created_at")
+      .eq("id", body.lookup_order_id.slice(0, 64))
+      .single();
+    if (!order) return json({ error: "Unknown order" }, 404);
+    return json(order);
+  }
+
   const { data: sk, error: skErr } = await supabase.rpc("dg_get_secret", {
     secret_name: "STRIPE_SECRET_KEY",
   });
@@ -96,11 +128,14 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const { style, product, art_url, preview_url, email, session_key, utm } = body;
+  const { style, product, art_url, preview_url, email, session_key, utm, photo } = body;
   const digital = body.digital === true;
   if (!PRICES[product]) return json({ error: "Unknown product" }, 400);
   if (!validUrl(art_url)) {
     return json({ error: "Missing or invalid art_url - render a preview first" }, 400);
+  }
+  if (DECK_PRODUCTS.has(product) && typeof photo === "string" && photo.length > MAX_PHOTO_B64) {
+    return json({ error: "Photo too large - resize to 1024px first" }, 400);
   }
 
   const code = cleanCode(body.promo);
@@ -126,11 +161,23 @@ Deno.serve(async (req: Request) => {
     .single();
   if (orderErr) return json({ error: "Could not create order" }, 500);
 
+  // Full-deck rendering (see dg-webhook) needs the buyer's actual face photo, not
+  // just the one preview render. Stash it now; the webhook picks it up after payment.
+  if (DECK_PRODUCTS.has(product) && typeof photo === "string" && photo.startsWith("data:image/")) {
+    const sourceUrl = await persistDataUrl(supabase, photo, order.id);
+    if (sourceUrl) {
+      await supabase.from("dg_orders").update({ source_photo_url: sourceUrl }).eq("id", order.id);
+    }
+  }
+
   const displayImage = validUrl(preview_url) ? preview_url : art_url;
   const p = new URLSearchParams();
   p.set("mode", "payment");
   p.set("client_reference_id", order.id);
-  p.set("success_url", SITE + "/?order=success&sid={CHECKOUT_SESSION_ID}");
+  p.set(
+    "success_url",
+    SITE + "/?order=success&sid={CHECKOUT_SESSION_ID}&oid=" + encodeURIComponent(order.id),
+  );
   p.set("cancel_url", SITE + "/?order=cancelled");
   p.set("line_items[0][quantity]", "1");
   p.set("line_items[0][price_data][currency]", "usd");

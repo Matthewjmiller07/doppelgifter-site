@@ -1,4 +1,6 @@
 // Stripe webhook: payment confirmed -> create Printify product + order (draft) -> funny email.
+// For the Parlour Deck, payment also kicks off the dg-deck-batch chain, which renders
+// the full personalized 48-scene deck and sends a second "deck ready" email once done.
 // Auth: Stripe HMAC signature verification (verify_jwt is off because Stripe
 // cannot send Supabase JWTs; every request is validated against STRIPE_WEBHOOK_SECRET).
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -19,9 +21,16 @@ const PRODUCT_QUIPS: Record<string, string> = {
   tee: "their likeness is being screen-printed onto soft cotton at industrial speed",
   blanket: "their face is being woven into 50×60 inches of fleece, edge to edge, no escape",
   poster: "their portrait is being pressed onto museum-grade matte paper, frame-ready",
-  deck: "fifty-four linen-finish cards are being dealt their face, one solemn scene at a time",
-  cards: "fifty-four linen-finish cards are being dealt their face, one solemn scene at a time",
+  deck: "the atelier is now painting all 48 scenes of them, one at a time — a second email lands when the gallery is ready",
+  cards: "the atelier is now painting all 48 scenes of them, one at a time — a second email lands when the gallery is ready",
 };
+const DECK_PRODUCTS = new Set(["deck", "cards"]);
+
+function subjectNameFromStyle(style: unknown): string {
+  const m = /starring\s+(.+)$/i.exec(String(style ?? ""));
+  const name = m?.[1]?.trim();
+  return name && name.length <= 24 ? name : "Dave";
+}
 
 async function verifySignature(payload: string, header: string, secret: string): Promise<boolean> {
   const t = header.split(",").find((p) => p.startsWith("t="))?.slice(2);
@@ -87,6 +96,35 @@ async function sendConfirmationEmail(supabase: any, s: any, orderId: string) {
   }
 }
 
+// Kicks off the deck render as a chain of short-lived dg-deck-batch invocations —
+// see that function's header comment for why (a single long background task hits
+// this project's 150s wall-clock ceiling and gets silently killed partway through,
+// which is exactly what happened before dg-deck-batch existed).
+async function startDeckRender(
+  supabase: any,
+  orderId: string,
+  photoUrl: string,
+  subjectName: string,
+  buyerEmail: string | null,
+) {
+  const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  try {
+    await fetch("https://knbyyykfwwlgnizutqyb.supabase.co/functions/v1/dg-deck-batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${svcKey}` },
+      body: JSON.stringify({
+        order_id: orderId,
+        photo_url: photoUrl,
+        subject_name: subjectName,
+        buyer_email: buyerEmail,
+        start_index: 0,
+      }),
+    });
+  } catch (_) {
+    await supabase.from("dg_orders").update({ deck_status: "failed" }).eq("id", orderId);
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return new Response("POST only", { status: 405 });
   const payload = await req.text();
@@ -113,7 +151,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: existing } = await supabase
     .from("dg_orders")
-    .select("id,status")
+    .select("id,status,source_photo_url")
     .eq("id", orderId)
     .single();
   if (!existing) return new Response("unknown order", { status: 200 });
@@ -137,6 +175,20 @@ Deno.serve(async (req: Request) => {
 
   if (s.metadata?.product !== "mug") {
     await sendConfirmationEmail(supabase, s, orderId);
+
+    if (DECK_PRODUCTS.has(s.metadata?.product)) {
+      // Fall back to the single rendered art if no raw face photo was captured
+      // (e.g. an older client, or the demo gentleman) — always render *something*.
+      const sourcePhoto = existing.source_photo_url || s.metadata?.art_url;
+      if (sourcePhoto) {
+        await supabase.from("dg_orders").update({ deck_status: "rendering" }).eq("id", orderId);
+        const subjectName = subjectNameFromStyle(s.metadata?.style);
+        const bg = startDeckRender(supabase, orderId, sourcePhoto, subjectName, buyerEmail);
+        const rt = (globalThis as any).EdgeRuntime;
+        if (rt?.waitUntil) rt.waitUntil(bg);
+        else await bg; // local/dev fallback where EdgeRuntime isn't present
+      }
+    }
     return new Response("paid; manual fulfillment product", { status: 200 });
   }
 

@@ -273,9 +273,15 @@
   .pcard:first-child { transform: rotate(-4deg); }
   .pcard:last-child { transform: rotate(4deg); }
   .pcard .pcat { display: block; font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--seal); font-weight: 700; margin-bottom: 8px; }
-  .pcard img { width: 76px; height: 94px; object-fit: cover; border-radius: 50% / 42%; border: 2px solid var(--gilt); display: block; margin: 0 auto 8px; }
+  .pimgwrap { position: relative; width: 76px; height: 94px; margin: 0 auto 8px; }
+  .pcard img { width: 76px; height: 94px; object-fit: cover; border-radius: 50% / 42%; border: 2px solid var(--gilt); display: block; }
   .pcard .pprompt { display: block; font-family: "Palatino", "Iowan Old Style", "Book Antiqua", Georgia, serif; font-size: 13.5px; line-height: 1.25; min-height: 3.4em; }
   .pcard .pnum { display: block; font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); margin-top: 6px; }
+  .veil-sm { border-radius: 50% / 42%; padding: 4px; }
+  .veil-sm .ring { width: 22px; height: 22px; border-width: 3px; }
+  .veil-sm .veilText { font-size: 9px; }
+  #deckPitch .pitchlede { text-align: center; max-width: 52ch; margin: 0 auto 18px; font-size: 13.5px; color: var(--ink-soft); }
+  #deckPitch .pitchlede b { color: var(--ink); }
   #deckPitch .pitchcopy { text-align: center; max-width: 56ch; margin: 18px auto 0; font-size: 14.5px; color: var(--ink-soft); }
   #deckPitch .pitchcopy b, #deckPitch .pitchcopy em { color: var(--ink); }
 </style>
@@ -429,30 +435,40 @@
       <span class="plaque">On the goods — live</span>
     </div>
     <div id="deckPitch">
+      <p class="pitchlede" id="pitchLede">Three cards from their deck — <b>rendered from the demo gentleman.</b> Upload their photo in Step 1 and these repaint with their actual face.</p>
       <div class="pcardrow" aria-hidden="true">
-        <div class="pcard">
+        <div class="pcard" data-scene="solemnly knighting a confused pigeon with a sword">
           <span class="pcat">Acts of Nobility</span>
-          <img src="demo/renaissance-art.png" alt="">
-          <span class="pprompt">Dave knighting a confused pigeon</span>
-          <span class="pnum">Doppelgifter Parlour Deck · No. 2 of 54</span>
+          <div class="pimgwrap">
+            <img id="pcardImg0" src="demo/pitch-knight.jpg" alt="">
+            <div class="veil veil-sm" id="veilPcard0"><div class="ring"></div><div class="veilText">Painting…</div></div>
+          </div>
+          <span class="pprompt" id="pcardPrompt0">{name} knighting a confused pigeon</span>
+          <span class="pnum">Doppelgifter Parlour Deck · No. 2 of 48</span>
         </div>
-        <div class="pcard">
-          <span class="pcat">Domestic Tragedies</span>
-          <img src="demo/renaissance-art.png" alt="">
-          <span class="pprompt">Dave discovering the milk is empty</span>
-          <span class="pnum">Doppelgifter Parlour Deck · No. 19 of 54</span>
+        <div class="pcard" data-scene="pouring from an empty milk jug over cereal, betrayed expression">
+          <span class="pcat">Modern Peasantry</span>
+          <div class="pimgwrap">
+            <img id="pcardImg1" src="demo/pitch-milk.jpg" alt="">
+            <div class="veil veil-sm" id="veilPcard1"><div class="ring"></div><div class="veilText">Painting…</div></div>
+          </div>
+          <span class="pprompt" id="pcardPrompt1">{name} discovering the milk is empty mid-pour</span>
+          <span class="pnum">Doppelgifter Parlour Deck · No. 19 of 48</span>
         </div>
-        <div class="pcard">
-          <span class="pcat">Feats of Celebration</span>
-          <img src="demo/renaissance-art.png" alt="">
-          <span class="pprompt">Dave dancing at a wedding</span>
-          <span class="pnum">Doppelgifter Parlour Deck · No. 38 of 54</span>
+        <div class="pcard" data-scene="dancing exuberantly at a wedding, arms flailing">
+          <span class="pcat">The Family Archive</span>
+          <div class="pimgwrap">
+            <img id="pcardImg2" src="demo/pitch-wedding.jpg" alt="">
+            <div class="veil veil-sm" id="veilPcard2"><div class="ring"></div><div class="veilText">Painting…</div></div>
+          </div>
+          <span class="pprompt" id="pcardPrompt2">{name} dancing at a wedding</span>
+          <span class="pnum">Doppelgifter Parlour Deck · No. 36 of 48</span>
         </div>
       </div>
       <p class="pitchcopy"><b>How it plays:</b> draw a card, act out the scene, say absolutely nothing. Your loved ones
         scream <em>"DAVE!"</em> at escalating volume until someone names the deed. Most cards by the end of the
         evening wins the tuck box; everyone else claims they weren't really trying.</p>
-      <p class="pitchcopy">All 54 cards are painted with <b>their</b> face — a different scene of them on every single card.
+      <p class="pitchcopy">All 48 scenes are painted with <b>their</b> face — a different scene of them on every card in the deck.
         <a href="charades.html" style="color:var(--gilt); font-weight:650;">Preview the full deck &amp; play a free round →</a></p>
     </div>
     <div class="actions">
@@ -674,6 +690,7 @@
     state.gift = c.dataset.gift;
     state.price = parseFloat(c.dataset.price);
     document.getElementById("deckPitch").style.display = state.gift === "The Parlour Deck" ? "block" : "none";
+    if (state.gift === "The Parlour Deck") renderPitchCards();
     var box = document.getElementById("livePrev4");
     var giftKey = GIFT_KEYS[state.gift];
     box.style.display = "block";
@@ -767,6 +784,39 @@
   function showMock(url) {
     document.getElementById("summaryArt2").style.display = "block";
     document.getElementById("mockupImg").src = url;
+  }
+
+  /* Parlour Deck pitch cards: real scenes of THEM once a photo exists, painted live. */
+  var pitchCache = {}, pitchStarted = false;
+  function renderPitchCards() {
+    var cards = document.querySelectorAll("#deckPitch .pcard");
+    cards.forEach(function (c) {
+      var p = c.querySelector(".pprompt");
+      p.textContent = p.textContent.replace(/\{name\}/g, "Dave");
+    });
+    if (!state.photo) {
+      document.getElementById("pitchLede").innerHTML =
+        "Three cards from their deck — <b>rendered from the demo gentleman.</b> Upload their photo in Step 1 and every card repaints with their actual face.";
+      return;
+    }
+    document.getElementById("pitchLede").innerHTML = "Three cards from <b>their</b> deck, painted just now.";
+    if (pitchStarted) return;
+    pitchStarted = true;
+    cards.forEach(function (card, i) {
+      var scene = card.dataset.scene;
+      var img = document.getElementById("pcardImg" + i);
+      var v = document.getElementById("veilPcard" + i);
+      if (pitchCache[scene]) { img.src = pitchCache[scene]; return; }
+      v.classList.add("on");
+      dgRender({ photo: state.photo, scene: scene }).then(function (d) {
+        pitchCache[scene] = d.art;
+        img.src = d.art;
+        v.classList.remove("on");
+      }).catch(function (e) {
+        v.querySelector(".veilText").textContent = e.code === 402 ? "📧 Email needed" : "😔 Hiccup";
+        setTimeout(function () { v.classList.remove("on"); }, 2200);
+      });
+    });
   }
 
   var pillTimer = null, pillHide = null;
@@ -1047,10 +1097,14 @@
       try {
         localStorage.dgLastOrder = JSON.stringify({ img: mock || art, gift: state.gift, style: state.style });
       } catch (err) {}
+      var checkoutBody = { style: state.style, product: GIFT_KEYS[state.gift], art_url: art, preview_url: mock, email: dgEmail(), session_key: SKEY, utm: dgUtm(), digital: document.getElementById("digitalUp").checked, promo: state.promoCode || undefined };
+      // The Parlour Deck renders all 48 scenes after purchase (see dg-webhook) — it
+      // needs their actual face photo, not just the one style preview.
+      if (GIFT_KEYS[state.gift] === "cards") checkoutBody.photo = state.photo;
       return fetch(CONFIG.url + "/functions/v1/dg-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
-        body: JSON.stringify({ style: state.style, product: GIFT_KEYS[state.gift], art_url: art, preview_url: mock, email: dgEmail(), session_key: SKEY, utm: dgUtm(), digital: document.getElementById("digitalUp").checked, promo: state.promoCode || undefined })
+        body: JSON.stringify(checkoutBody)
       }).then(function (res) { return res.json(); }).then(function (d) {
         if (d.url) { location.href = d.url; return; }
         throw new Error(d.error || "checkout failed");
@@ -1095,6 +1149,7 @@
       try { ttq.track("CompletePayment", { currency: "USD", value: orderValue }); } catch (e) {}
     }
     var sid = new URLSearchParams(location.search).get("sid");
+    var oid = new URLSearchParams(location.search).get("oid");
     if (sid) {
       fetch(CONFIG.url + "/functions/v1/dg-checkout", {
         method: "POST",
@@ -1103,6 +1158,12 @@
       }).then(function (r) { return r.json(); }).then(function (d) {
         if (d && d.preview_url) {
           applyOrder(d.preview_url, (GIFT_NAMES[d.product] || d.product) + " — " + d.style);
+        }
+        if (d && (d.product === "deck" || d.product === "cards") && oid) {
+          document.querySelector("#s0 .lede").innerHTML =
+            "Payment received. The atelier is now painting all <b>48 scenes</b> of them, one at a time — " +
+            "a second email lands when the full deck is ready. <a href=\"deck-ready.html?order=" + encodeURIComponent(oid) +
+            "\" style=\"color:var(--gilt);font-weight:650;\">Watch it get painted live →</a>";
         }
       }).catch(function (e) {});
     }
