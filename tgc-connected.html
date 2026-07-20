@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connected — DoppelGifter</title>
+<style>
+  :root { --ground:#F5F1E6; --ground-raise:#FDFBF4; --ink:#1E3329; --ink-soft:#52655B; --gilt:#A87F1F; --seal:#B03A2E; --line:#D8D0BC; }
+  @media (prefers-color-scheme: dark) { :root { --ground:#142720; --ground-raise:#1C332A; --ink:#EDE6D3; --ink-soft:#9FB0A4; --gilt:#C8A028; --seal:#C4483B; --line:#2E4A3D; } }
+  :root[data-theme="dark"] { --ground:#142720; --ground-raise:#1C332A; --ink:#EDE6D3; --ink-soft:#9FB0A4; --gilt:#C8A028; --seal:#C4483B; --line:#2E4A3D; }
+  :root[data-theme="light"] { --ground:#F5F1E6; --ground-raise:#FDFBF4; --ink:#1E3329; --ink-soft:#52655B; --gilt:#A87F1F; --seal:#B03A2E; --line:#D8D0BC; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:var(--ground); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .card { max-width:440px; margin:24px; padding:36px 30px; background:var(--ground-raise); border:1px solid var(--line);
+    border-radius:10px; text-align:center; }
+  h1 { font-family:"Palatino","Iowan Old Style",Georgia,serif; font-weight:500; font-size:28px; margin:0 0 12px; }
+  p { color:var(--ink-soft); font-size:15px; line-height:1.55; margin:0 0 8px; }
+  .ok { font-size:40px; margin-bottom:8px; }
+  a { color:var(--gilt); font-weight:650; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="ok">🎴</div>
+    <h1>The Game Crafter is connected.</h1>
+    <p>The atelier can now build and ship fully personalized decks automatically — every card a different scene, no manual steps per order.</p>
+    <p><a href="index.html">Back to DoppelGifter →</a></p>
+  </div>
+</body>
+</html>
