@@ -124,7 +124,10 @@ Return only the finished house-rules text, nothing else.`;
       }),
     });
     const data = await res.json();
-    const text = data?.content?.[0]?.text;
+    // Sonnet 5 sometimes emits a leading "thinking" content block before the text
+    // block, so find by type rather than assuming index 0 is the answer.
+    const textBlock = Array.isArray(data?.content) ? data.content.find((b: any) => b.type === "text") : null;
+    const text = textBlock?.text;
     return typeof text === "string" && text.trim() ? text.trim().slice(0, 1200) : null;
   } catch (_e) {
     return null;
