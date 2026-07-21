@@ -214,7 +214,9 @@ async function processBatch(
             prompt: scenePrompt(key),
             quality: "low",
             aspect_ratio: "2:3",
-            output_format: "webp",
+            // PNG, not webp: these images are the eventual Card face uploads for TGC
+            // fulfillment, and TGC's File API only accepts PNG/JPEG/SVG/ZIP/PDF.
+            output_format: "png",
             number_of_images: 1,
             input_images: [photoUrl],
           },
@@ -240,10 +242,10 @@ async function processBatch(
       if (pred.status !== "succeeded") throw new Error(pred.error ?? `scene ${idx} failed`);
       const replicateUrl = Array.isArray(pred.output) ? pred.output[0] : pred.output;
       const bytes = new Uint8Array(await (await fetch(replicateUrl)).arrayBuffer());
-      const path = `${orderId}/card-${String(idx).padStart(2, "0")}.webp`;
+      const path = `${orderId}/card-${String(idx).padStart(2, "0")}.png`;
       const { error: upErr } = await supabase.storage
         .from("dg-art")
-        .upload(path, bytes, { contentType: "image/webp", upsert: true });
+        .upload(path, bytes, { contentType: "image/png", upsert: true });
       const artUrl = upErr ? replicateUrl : supabase.storage.from("dg-art").getPublicUrl(path).data.publicUrl;
       return { category, prompt: display.replace(/\{name\}/g, subjectName), art_url: artUrl };
     }
