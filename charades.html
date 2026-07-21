@@ -282,6 +282,15 @@
         <label for="nameInput">Their name (the cards will use it)</label>
         <input type="text" id="nameInput" maxlength="24" placeholder="e.g. Dave">
         <p class="hint" style="margin-top:10px">Prompts like <em>"Dave discovering the milk is empty mid-pour."</em> The name does a lot of work.</p>
+        <label for="styleSeg" style="margin-top:18px">Their style</label>
+        <span class="seg" id="styleSeg">
+          <button type="button" data-style="renaissance" class="on">Renaissance</button>
+          <button type="button" data-style="cartoon">Cartoon</button>
+          <button type="button" data-style="glamour">'85 Glamour</button>
+          <button type="button" data-style="marble">Marble Bust</button>
+        </span>
+        <label for="aboutInput" style="margin-top:18px">Tell the oracle about them <span style="text-transform:none;font-weight:400;color:var(--ink-soft)">(optional — flavors the printed house rules)</span></label>
+        <textarea id="aboutInput" rows="2" maxlength="500" style="width:100%;max-width:320px;font:inherit;color:var(--ink);background:var(--ground-raise);border:1px solid var(--line);border-radius:4px;padding:11px 14px;resize:vertical" placeholder="e.g. Drinks six coffees a day, cries at dog videos, will not shut up about his sourdough starter…"></textarea>
       </div>
     </div>
   </section>
@@ -407,7 +416,27 @@
   catch (e) { SKEY = "nostore-" + Math.random().toString(36).slice(2); }
 
   var DEMO_FACE = "demo/renaissance-art.png";
-  var state = { photo: null, face: DEMO_FACE, painted: false, name: "" };
+  var state = { photo: null, face: DEMO_FACE, painted: false, name: "", artStyle: "renaissance", about: "" };
+  var STYLE_LABELS = { renaissance: "Renaissance", cartoon: "Cartoon", glamour: "'85 Glamour", marble: "a Marble Bust" };
+
+  // Picks up photo/style/oracle-text left by index.html's mug/tee/etc funnel when the
+  // visitor jumps here via a "play charades" link, so switching pages doesn't discard
+  // what they already uploaded and typed. One-time consume: cleared right after reading.
+  (function consumeHandoff() {
+    var raw;
+    try { raw = localStorage.dgHandoff; } catch (e) { return; }
+    if (!raw) return;
+    try { localStorage.removeItem("dgHandoff"); } catch (e) {}
+    var h;
+    try { h = JSON.parse(raw); } catch (e) { return; }
+    if (h && typeof h.photo === "string" && h.photo.indexOf("data:image/") === 0) {
+      state.photo = h.photo;
+      state.face = h.photo;
+      state.painted = false;
+    }
+    if (h && STYLE_LABELS[h.style]) state.artStyle = h.style;
+    if (h && typeof h.about === "string") state.about = h.about.slice(0, 500);
+  })();
 
   /* ---------------- The deck ----------------
      [category, prompt shown on the card, scene phrase sent to the painter] */
@@ -475,7 +504,7 @@
   function cardEl(entry, num) {
     var d = document.createElement("div");
     d.className = "ccard";
-    var sceneArt = sceneCache[entry[2]];
+    var sceneArt = sceneCache[cacheKey(entry[2])];
     var art = sceneArt
       ? '<div class="plate"><img alt="Them, painted mid-scene"></div>'
       : '<div class="oval"><img alt="Their face, in a gilt oval frame"></div>';
@@ -487,7 +516,7 @@
     d.querySelector(".ribbon").textContent = entry[0];
     d.querySelector(".artzone img").src = sceneArt || state.face;
     d.querySelector(".prompt").textContent = promptText(entry);
-    if (stagingNow[entry[2]]) {
+    if (stagingNow[cacheKey(entry[2])]) {
       var v = document.createElement("div");
       v.className = "cveil";
       v.textContent = "🎨 The court painter is staging this scene…";
@@ -534,28 +563,31 @@
   /* ---------------- Scene staging: paint them INTO the card ---------------- */
   var stageBtn = document.getElementById("stageBtn");
   var stageNote = document.getElementById("stageNote");
+  function cacheKey(sceneKey) { return state.artStyle + "|" + sceneKey; }
   function resetStageBtn() {
     stageBtn.style.display = state.photo ? "inline-flex" : "none";
     stageBtn.disabled = false;
-    var unstaged = fanPicks.filter(function (i) { return !sceneCache[DECK[i][2]]; }).length;
-    stageBtn.textContent = unstaged ? "🎭 Paint them into these scenes (~30s, all at once)" : "✓ Scenes staged — deal new cards for more";
+    var unstaged = fanPicks.filter(function (i) { return !sceneCache[cacheKey(DECK[i][2])]; }).length;
+    stageBtn.textContent = unstaged
+      ? "🎭 Paint them into these " + STYLE_LABELS[state.artStyle] + " scenes (~30s, all at once)"
+      : "✓ Scenes staged — deal new cards for more";
     if (!unstaged && state.photo) stageBtn.disabled = true;
   }
   function stageScene(entry) {
-    var key = entry[2];
-    if (sceneCache[key]) return Promise.resolve();
-    stagingNow[key] = true;
+    var key = entry[2], ckey = cacheKey(key);
+    if (sceneCache[ckey]) return Promise.resolve();
+    stagingNow[ckey] = true;
     refreshAllCards();
-    return dgRender({ photo: state.photo, scene: key }).then(function (d) {
-      sceneCache[key] = d.art;
+    return dgRender({ photo: state.photo, scene: key, style: state.artStyle }).then(function (d) {
+      sceneCache[ckey] = d.art;
     }).finally(function () {
-      delete stagingNow[key];
+      delete stagingNow[ckey];
       refreshAllCards();
     });
   }
   function stageAll() {
     var entries = fanPicks.map(function (i) { return DECK[i]; })
-      .filter(function (en) { return !sceneCache[en[2]]; });
+      .filter(function (en) { return !sceneCache[cacheKey(en[2])]; });
     if (!entries.length || !state.photo) return;
     stageBtn.disabled = true;
     stageNote.textContent = "";
@@ -609,6 +641,14 @@
   });
   fileInput.addEventListener("change", function () { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
 
+  function paintBtnLabel() { return "🎨 Paint them " + STYLE_LABELS[state.artStyle] + " first (~30s)"; }
+  function resetPaintBtn() {
+    var pb = document.getElementById("paintBtn");
+    pb.style.display = state.photo && !state.painted ? "inline-flex" : "none";
+    pb.disabled = false;
+    pb.textContent = paintBtnLabel();
+  }
+
   function handleFile(f) {
     var img = new Image();
     img.onload = function () {
@@ -623,10 +663,7 @@
       state.painted = false;
       document.getElementById("fileMeta").textContent =
         f.name + " → " + c.width + "×" + c.height + " (~" + Math.round(state.photo.length * 0.75 / 1024) + " KB, shrunk here, not uploaded)";
-      var pb = document.getElementById("paintBtn");
-      pb.style.display = "inline-flex";
-      pb.disabled = false;
-      pb.textContent = "🎨 Paint them Renaissance first (~30s)";
+      resetPaintBtn();
       document.getElementById("paintNote").textContent = "";
       URL.revokeObjectURL(img.src);
       refreshAllCards();
@@ -662,18 +699,38 @@
     var btn = this;
     btn.disabled = true;
     btn.textContent = "🎨 The court painter is at his easel…";
-    dgRender({ photo: state.photo, style: "renaissance" }).then(function (d) {
+    dgRender({ photo: state.photo, style: state.artStyle }).then(function (d) {
       state.face = d.art;
       state.painted = true;
       btn.textContent = "✓ Painted";
       refreshAllCards();
     }).catch(function (e) {
       btn.disabled = false;
-      btn.textContent = "🎨 Paint them Renaissance first (~30s)";
+      btn.textContent = paintBtnLabel();
       document.getElementById("paintNote").textContent = e.code === 402
         ? "The atelier wants an email first — leave one on the main page, or play with the photo as-is. It still works."
         : "The atelier hiccuped (" + e.message + "). The photo as-is works fine for the game.";
     });
+  });
+
+  /* ---------------- Style picker + oracle field ---------------- */
+  document.getElementById("styleSeg").querySelectorAll("button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      if (b.dataset.style === state.artStyle) return;
+      document.getElementById("styleSeg").querySelectorAll("button").forEach(function (x) { x.classList.remove("on"); });
+      b.classList.add("on");
+      state.artStyle = b.dataset.style;
+      // A style change invalidates the previously-painted fallback portrait, but not
+      // sceneCache — that's keyed by style now, so switching back is instant and free.
+      state.painted = false;
+      state.face = state.photo || DEMO_FACE;
+      resetPaintBtn();
+      resetStageBtn();
+      refreshAllCards();
+    });
+  });
+  document.getElementById("aboutInput").addEventListener("input", function () {
+    state.about = this.value.slice(0, 500);
   });
 
   /* ---------------- The game ---------------- */
@@ -843,6 +900,8 @@
     var body = {
       product: "deck",
       style: subject ? "Parlour Deck — starring " + subject : "Parlour Deck",
+      art_style: state.artStyle,
+      about: state.about || undefined,
       art_url: art,
       preview_url: art,
       session_key: SKEY
@@ -872,6 +931,18 @@
       note.textContent = "😔 The cashier stepped away: " + e.message + " — try again in a moment.";
     });
   });
+
+  /* ---------------- Hydrate UI from any index.html handoff ---------------- */
+  if (state.artStyle !== "renaissance") {
+    document.getElementById("styleSeg").querySelectorAll("button").forEach(function (b) {
+      b.classList.toggle("on", b.dataset.style === state.artStyle);
+    });
+  }
+  if (state.about) document.getElementById("aboutInput").value = state.about;
+  if (state.photo) {
+    document.getElementById("fileMeta").textContent = "Brought over from your other DoppelGifter preview.";
+    resetPaintBtn();
+  }
 
   renderFan();
   renderDeckStack();

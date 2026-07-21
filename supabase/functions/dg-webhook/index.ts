@@ -106,6 +106,8 @@ async function startDeckRender(
   photoUrl: string,
   subjectName: string,
   buyerEmail: string | null,
+  artStyle: string,
+  aboutText: string | null,
 ) {
   const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   try {
@@ -118,6 +120,8 @@ async function startDeckRender(
         subject_name: subjectName,
         buyer_email: buyerEmail,
         start_index: 0,
+        art_style: artStyle,
+        about_text: aboutText,
       }),
     });
   } catch (_) {
@@ -151,7 +155,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: existing } = await supabase
     .from("dg_orders")
-    .select("id,status,source_photo_url")
+    .select("id,status,source_photo_url,art_style,about_text")
     .eq("id", orderId)
     .single();
   if (!existing) return new Response("unknown order", { status: 200 });
@@ -183,7 +187,8 @@ Deno.serve(async (req: Request) => {
       if (sourcePhoto) {
         await supabase.from("dg_orders").update({ deck_status: "rendering" }).eq("id", orderId);
         const subjectName = subjectNameFromStyle(s.metadata?.style);
-        const bg = startDeckRender(supabase, orderId, sourcePhoto, subjectName, buyerEmail);
+        const artStyle = existing.art_style || s.metadata?.art_style || "renaissance";
+        const bg = startDeckRender(supabase, orderId, sourcePhoto, subjectName, buyerEmail, artStyle, existing.about_text ?? null);
         const rt = (globalThis as any).EdgeRuntime;
         if (rt?.waitUntil) rt.waitUntil(bg);
         else await bg; // local/dev fallback where EdgeRuntime isn't present

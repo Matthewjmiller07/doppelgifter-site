@@ -785,6 +785,21 @@
   var DEMO_ART = "demo/renaissance-art.png";
   function absUrl(p) { return new URL(p, location.href).href; }
 
+  // Hand off photo/style/oracle-text to charades.html so following any
+  // "play charades" link doesn't discard progress made on this page.
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest('a[href="charades.html"]');
+    if (!a) return;
+    try {
+      var aboutEl = document.getElementById("aboutText");
+      localStorage.dgHandoff = JSON.stringify({
+        photo: typeof state.photo === "string" && state.photo.indexOf("data:image/") === 0 ? state.photo : null,
+        style: STYLE_KEYS[state.style] || "renaissance",
+        about: aboutEl ? aboutEl.value.trim().slice(0, 500) : "",
+      });
+    } catch (err) {}
+  });
+
   function dgEmail() {
     try { return localStorage.dgEmail || null; } catch (e) { return null; }
   }

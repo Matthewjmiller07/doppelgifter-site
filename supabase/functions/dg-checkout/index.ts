@@ -130,6 +130,10 @@ Deno.serve(async (req: Request) => {
 
   const { style, product, art_url, preview_url, email, session_key, utm, photo } = body;
   const digital = body.digital === true;
+  const artStyle = typeof body.art_style === "string" && /^[a-z]{1,20}$/.test(body.art_style)
+    ? body.art_style
+    : "renaissance";
+  const aboutText = typeof body.about === "string" ? body.about.trim().slice(0, 500) : null;
   if (!PRICES[product]) return json({ error: "Unknown product" }, 400);
   if (!validUrl(art_url)) {
     return json({ error: "Missing or invalid art_url - render a preview first" }, 400);
@@ -149,6 +153,8 @@ Deno.serve(async (req: Request) => {
     .from("dg_orders")
     .insert({
       style: String(style ?? "unknown"),
+      art_style: artStyle,
+      about_text: aboutText,
       product,
       price_cents: PRICES[product].cents + (digital ? DIGITAL_CENTS : 0) -
         (promo?.amountOff ?? 0),
@@ -208,6 +214,7 @@ Deno.serve(async (req: Request) => {
   p.set("metadata[order_id]", order.id);
   p.set("metadata[product]", product);
   p.set("metadata[style]", String(style ?? ""));
+  p.set("metadata[art_style]", artStyle);
   p.set("metadata[art_url]", art_url);
   if (digital) p.set("metadata[digital]", "1");
   if (validUrl(preview_url)) p.set("metadata[preview_url]", preview_url);

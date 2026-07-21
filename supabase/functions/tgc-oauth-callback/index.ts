@@ -30,10 +30,12 @@ Deno.serve(async (req: Request) => {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ private_key: privateKey }).toString(),
   });
-  const session = await res.json();
+  const body = await res.json();
+  // TGC's Wing API wraps successful payloads as {"result": {...}}.
+  const session = body?.result ?? body;
   if (!res.ok || !session?.id) {
     return new Response(
-      `Session exchange failed: ${JSON.stringify(session).slice(0, 500)}`,
+      `Session exchange failed: ${JSON.stringify(body).slice(0, 500)}`,
       { status: 502 },
     );
   }

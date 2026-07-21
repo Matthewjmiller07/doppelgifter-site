@@ -65,8 +65,18 @@ const SCENES: [string, string, string][] = [
   ["The Family Archive", "{name} watching a scary movie through their fingers", "peeking at something terrifying through their fingers"],
 ];
 
-const SCENE_PROMPT = (scene: string) =>
-  `Repaint the person in image 1 as the subject of a 16th-century Renaissance oil painting: a theatrical three-quarter-length scene in which they are ${scene}. Comedic but painterly period staging with simple props, dark museum background, dramatic chiaroscuro lighting, subtle cracked-varnish texture. Preserve their facial likeness, expression, glasses and hair exactly. Portrait-orientation flat artwork, no frame, no text.`;
+// Kept in sync with dg-render's SCENE_PROMPTS — same four styles, same visual language,
+// so the free pre-purchase preview scenes and the post-purchase full deck match.
+const SCENE_PROMPTS: Record<string, (scene: string) => string> = {
+  renaissance: (scene) =>
+    `Repaint the person in image 1 as the subject of a 16th-century Renaissance oil painting: a theatrical three-quarter-length scene in which they are ${scene}. Comedic but painterly period staging with simple props, dark museum background, dramatic chiaroscuro lighting, subtle cracked-varnish texture. Preserve their facial likeness, expression, glasses and hair exactly. Portrait-orientation flat artwork, no frame, no text.`,
+  cartoon: (scene) =>
+    `Redraw the person in image 1 as a 1990s Saturday-morning cartoon character: a theatrical three-quarter-length scene in which they are ${scene}. Bold black outlines, flat cel shading, bright saturated colors, halftone dot background, exaggerated comedic expression. Preserve their recognizable facial features, glasses and hair. Portrait-orientation flat artwork, no frame, no text.`,
+  glamour: (scene) =>
+    `Rephotograph the person in image 1 as an 1980s department-store glamour shot: a theatrical three-quarter-length scene in which they are ${scene}. Dramatic soft focus, laser-beam grid background in teal and magenta, feathered lighting, slight vaseline lens glow. Preserve their facial likeness exactly. Portrait-orientation flat artwork, no frame, no text.`,
+  marble: (scene) =>
+    `Resculpt the person in image 1 as a classical white marble statue in the style of ancient Greek statuary: a theatrical three-quarter-length scene in which they are ${scene}. Realistic marble veining, heroic yet comedic staging, dark charcoal gallery background, soft dramatic lighting. Preserve their recognizable facial features, glasses and hair rendered in carved marble. Portrait-orientation flat artwork, no frame, no text.`,
+};
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: number | undefined;
@@ -78,7 +88,57 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   }) as Promise<T>;
 }
 
-async function sendDeckReadyEmail(supabase: any, to: string, orderId: string, rendered: number, failed: number) {
+// Calls Claude to write the printed deck's "House Rules" blurb, grounded in the
+// oracle "about them" text the buyer gave at checkout. Kept explicitly easy/guessable
+// per product direction — the personalization is the joke, not the difficulty.
+async function generateInstructionsCopy(
+  supabase: any,
+  subjectName: string,
+  artStyle: string,
+  aboutText: string | null,
+): Promise<string | null> {
+  try {
+    const { data: key } = await supabase.rpc("dg_get_secret", { secret_name: "ANTHROPIC_API_KEY" });
+    if (!key) return null;
+    const categories = Array.from(new Set(SCENES.map((s) => s[0])));
+    const about = (aboutText ?? "").trim().slice(0, 500);
+    const prompt = `Write the "House Rules" card for a personalized charades deck called The Parlour Deck.
+Subject: ${subjectName}. Art style: ${artStyle}. Card categories: ${categories.join(", ")}.
+${about ? `Something true about ${subjectName}, from the person who ordered this deck (use one or two specific, affectionate details from this if usable — never mocking, never anything embarrassing): "${about}"` : ""}
+
+Voice: mock-heraldic parlour-game humor, like a slightly self-important 18th-century games manual crossed with a warm family roast. Dry, a little pompous, affectionate. House copy for reference: "Fifty-four charades cards. One recurring subject. Currently screaming WEDDING! DANCING! IT'S DAVE AT THE WEDDING!"
+
+Hard requirements:
+- 100-160 words, plain prose paragraphs, no markdown headers or bullet lists, no emoji.
+- Cover: how a turn works (one actor, no talking, teammates shout guesses, pass if stuck), that it's pass-and-play, and a one-line nod to the categories.
+- Explicitly keep the game EASY and fast to guess — the joke is the personalization, not the difficulty. Do not propose harder rules, obscure prompts, or added penalties.
+- End with one short, warm line about ${subjectName}.
+Return only the finished house-rules text, nothing else.`;
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-5",
+        max_tokens: 400,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    const data = await res.json();
+    const text = data?.content?.[0]?.text;
+    return typeof text === "string" && text.trim() ? text.trim().slice(0, 1200) : null;
+  } catch (_e) {
+    return null;
+  }
+}
+
+async function sendDeckReadyEmail(
+  supabase: any,
+  to: string,
+  orderId: string,
+  rendered: number,
+  failed: number,
+  instructionsCopy: string | null,
+) {
   try {
     const { data: brevoKey } = await supabase.rpc("dg_get_secret", { secret_name: "BREVO_API_KEY" });
     if (!brevoKey) return;
@@ -86,6 +146,12 @@ async function sendDeckReadyEmail(supabase: any, to: string, orderId: string, re
     const note = failed
       ? `${rendered} of ${rendered + failed} scenes came out perfectly; the atelier's easel jammed on the rest, which is either art or a bug.`
       : `All ${rendered} scenes came out. The atelier is, for once, quite pleased with itself.`;
+    const rulesSection = instructionsCopy
+      ? `<div style="background:#F5F1E6;border:1px solid #D8D0BC;border-radius:6px;padding:20px 22px;margin:0 0 20px;">
+      <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#A87F1F;margin:0 0 8px;">House Rules</p>
+      <p style="font-size:14px;line-height:1.7;margin:0;">${instructionsCopy.replace(/\n+/g, "</p><p style=\"font-size:14px;line-height:1.7;margin:10px 0 0;\">")}</p>
+    </div>`
+      : "";
     const html = `
 <div style="background:#F5F1E6;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;color:#1E3329;">
   <div style="max-width:560px;margin:0 auto;background:#FDFBF4;border:1px solid #D8D0BC;border-radius:6px;padding:32px;">
@@ -93,6 +159,7 @@ async function sendDeckReadyEmail(supabase: any, to: string, orderId: string, re
     <h1 style="font-size:28px;margin:0 0 16px;font-weight:normal;">Their full deck is ready.</h1>
     <p style="font-size:16px;line-height:1.6;margin:0 0 20px;">${note}</p>
     <p style="text-align:center;margin:0 0 24px;"><a href="${link}" style="display:inline-block;background:#B03A2E;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:bold;">View the full deck →</a></p>
+    ${rulesSection}
     <p style="font-size:14px;line-height:1.6;color:#52655B;margin:0 0 8px;"><b>Worth knowing:</b> playing-card printing puts one design on the back of every card — that's how the physical deck's presses work, not a DoppelGifter limit. The printed deck carries your favorite scene from this gallery; the gallery itself is the full digital keepsake, all their faces, every scene.</p>
     <p style="font-size:13px;color:#52655B;line-height:1.6;margin:16px 0 0;">Order reference: ${orderId.slice(0, 8).toUpperCase()}. Questions? Just reply.</p>
   </div>
@@ -121,10 +188,13 @@ async function processBatch(
   subjectName: string,
   buyerEmail: string | null,
   startIndex: number,
+  artStyle: string,
+  aboutText: string | null,
 ) {
   try {
     const { data: token } = await supabase.rpc("dg_get_secret", { secret_name: "REPLICATE_API_TOKEN" });
     if (!token) throw new Error("no replicate token");
+    const scenePrompt = SCENE_PROMPTS[artStyle] ?? SCENE_PROMPTS.renaissance;
 
     const { data: existing } = await supabase.from("dg_orders").select("deck_art").eq("id", orderId).single();
     const results: { category: string; prompt: string; art_url: string }[] = Array.isArray(existing?.deck_art)
@@ -138,7 +208,7 @@ async function processBatch(
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "wait=60" },
         body: JSON.stringify({
           input: {
-            prompt: SCENE_PROMPT(key),
+            prompt: scenePrompt(key),
             quality: "low",
             aspect_ratio: "2:3",
             output_format: "webp",
@@ -198,6 +268,8 @@ async function processBatch(
             subject_name: subjectName,
             buyer_email: buyerEmail,
             start_index: nextIndex,
+            art_style: artStyle,
+            about_text: aboutText,
           }),
         });
       try {
@@ -209,11 +281,18 @@ async function processBatch(
       }
     } else {
       const totalFailed = SCENES.length - results.length;
+      const instructionsCopy = await generateInstructionsCopy(supabase, subjectName, artStyle, aboutText);
       await supabase
         .from("dg_orders")
-        .update({ deck_art: results, deck_status: totalFailed ? "partial" : "ready" })
+        .update({
+          deck_art: results,
+          deck_status: totalFailed ? "partial" : "ready",
+          ...(instructionsCopy ? { instructions_copy: instructionsCopy } : {}),
+        })
         .eq("id", orderId);
-      if (buyerEmail) await sendDeckReadyEmail(supabase, buyerEmail, orderId, results.length, totalFailed);
+      if (buyerEmail) {
+        await sendDeckReadyEmail(supabase, buyerEmail, orderId, results.length, totalFailed, instructionsCopy);
+      }
     }
   } catch (_e) {
     await supabase.from("dg_orders").update({ deck_status: "failed" }).eq("id", orderId);
@@ -228,13 +307,24 @@ Deno.serve(async (req: Request) => {
   } catch {
     return new Response("bad json", { status: 400 });
   }
-  const { order_id, photo_url, subject_name, buyer_email, start_index } = body;
+  const { order_id, photo_url, subject_name, buyer_email, start_index, art_style, about_text } = body;
   if (typeof order_id !== "string" || typeof photo_url !== "string" || typeof start_index !== "number") {
     return new Response("missing fields", { status: 400 });
   }
+  const artStyle = typeof art_style === "string" && SCENE_PROMPTS[art_style] ? art_style : "renaissance";
+  const aboutText = typeof about_text === "string" ? about_text.slice(0, 500) : null;
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const bg = processBatch(supabase, order_id, photo_url, subject_name || "Dave", buyer_email ?? null, start_index);
+  const bg = processBatch(
+    supabase,
+    order_id,
+    photo_url,
+    subject_name || "Dave",
+    buyer_email ?? null,
+    start_index,
+    artStyle,
+    aboutText,
+  );
   const rt = (globalThis as any).EdgeRuntime;
   if (rt?.waitUntil) rt.waitUntil(bg);
   else await bg;

@@ -17,8 +17,19 @@ const STYLES: Record<string, string> = {
     "Resculpt the person in image 1 as a classical white marble bust in the style of ancient Greek statuary, heroic noble expression, realistic marble veining, dark charcoal background, soft gallery lighting. Preserve their recognizable facial features, glasses and hair rendered in carved marble. Flat square artwork.",
 };
 
-const SCENE_PROMPT = (scene: string) =>
-  `Repaint the person in image 1 as the subject of a 16th-century Renaissance oil painting: a theatrical three-quarter-length scene in which they are ${scene}. Comedic but painterly period staging with simple props, dark museum background, dramatic chiaroscuro lighting, subtle cracked-varnish texture. Preserve their facial likeness, expression, glasses and hair exactly. Portrait-orientation flat artwork, no frame, no text.`;
+// One scene-prompt builder per style, mirroring the STYLES dict's visual language
+// above so a staged scene looks like it belongs to the same painted/rendered world
+// as the plain portrait in that style.
+const SCENE_PROMPTS: Record<string, (scene: string) => string> = {
+  renaissance: (scene) =>
+    `Repaint the person in image 1 as the subject of a 16th-century Renaissance oil painting: a theatrical three-quarter-length scene in which they are ${scene}. Comedic but painterly period staging with simple props, dark museum background, dramatic chiaroscuro lighting, subtle cracked-varnish texture. Preserve their facial likeness, expression, glasses and hair exactly. Portrait-orientation flat artwork, no frame, no text.`,
+  cartoon: (scene) =>
+    `Redraw the person in image 1 as a 1990s Saturday-morning cartoon character: a theatrical three-quarter-length scene in which they are ${scene}. Bold black outlines, flat cel shading, bright saturated colors, halftone dot background, exaggerated comedic expression. Preserve their recognizable facial features, glasses and hair. Portrait-orientation flat artwork, no frame, no text.`,
+  glamour: (scene) =>
+    `Rephotograph the person in image 1 as an 1980s department-store glamour shot: a theatrical three-quarter-length scene in which they are ${scene}. Dramatic soft focus, laser-beam grid background in teal and magenta, feathered lighting, slight vaseline lens glow. Preserve their facial likeness exactly. Portrait-orientation flat artwork, no frame, no text.`,
+  marble: (scene) =>
+    `Resculpt the person in image 1 as a classical white marble statue in the style of ancient Greek statuary: a theatrical three-quarter-length scene in which they are ${scene}. Realistic marble veining, heroic yet comedic staging, dark charcoal gallery background, soft dramatic lighting. Preserve their recognizable facial features, glasses and hair rendered in carved marble. Portrait-orientation flat artwork, no frame, no text.`,
+};
 
 const AI_MOCKUPS: Record<string, string> = {
   mug: "Professional e-commerce product photograph of an 11oz glossy white ceramic mug on a clean light-gray studio background with soft shadows. The artwork in image 1 is printed on the side of the mug. Preserve any caption text in the artwork exactly. Sharp focus, no added text or watermarks.",
@@ -71,6 +82,7 @@ Deno.serve(async (req: Request) => {
   const scene = typeof body.scene === "string"
     ? body.scene.replace(/["\\<>{}]/g, "").trim().slice(0, 110)
     : "";
+  const sceneStyle = typeof body.style === "string" && SCENE_PROMPTS[body.style] ? body.style : "renaissance";
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -244,7 +256,7 @@ Deno.serve(async (req: Request) => {
         secret_name: "REPLICATE_API_TOKEN",
       });
       if (secretError || !token) return json({ error: "Server configuration error" }, 500);
-      const replicateUrl = await predict(token, SCENE_PROMPT(scene), [photo], "scene", "webp", "2:3");
+      const replicateUrl = await predict(token, SCENE_PROMPTS[sceneStyle](scene), [photo], `scene:${sceneStyle}`, "webp", "2:3");
       let art = replicateUrl;
       try {
         art = await persistToStorage(replicateUrl, "webp", "image/webp");
