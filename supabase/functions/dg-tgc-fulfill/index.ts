@@ -22,8 +22,19 @@
 // Auth: verify_jwt is on (blocks fully anonymous requests) AND the caller must send
 // header x-admin-secret matching DG_ADMIN_SECRET — verify_jwt alone isn't enough
 // since the public anon key is valid client-side and would otherwise let anyone
-// trigger real TGC object creation. Invoke manually per order once deck_status is
-// "ready"; not wired into the automatic post-purchase pipeline yet.
+// trigger real TGC object creation. Server-side callers (dg-deck-batch's
+// auto-trigger once a deck finishes rendering, and this function chaining to
+// itself below) fetch the secret themselves and send the same header.
+//
+// 2026-07-24: rewritten to chain across invocations, one small card-upload batch
+// (or the finalize step) per invocation, resuming from `dg_orders.tgc_fulfill_state`
+// rather than trusting the caller's start index. Exists because the original
+// single-shot version hit a platform WORKER_RESOURCE_LIMIT above ~8 cards in one
+// invocation (confirmed live: 2 of 8 succeeded before the second internal chunk
+// of UPLOAD_CONCURRENCY crashed the same worker) — the first chunk of 6 alone
+// did NOT crash, so giving every batch a fresh invocation (same pattern
+// dg-deck-batch already uses for rendering, for the same 150s/memory ceiling)
+// should hold for all 48 cards of a real order.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Image, TextLayout } from "https://deno.land/x/imagescript@1.2.17/mod.ts";
 import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib@1.17.1";
@@ -33,6 +44,8 @@ const TGC_API = "https://www.thegamecrafter.com/api";
 const CARD_W = 825;
 const CARD_H = 1125;
 const UPLOAD_CONCURRENCY = 6;
+const SELF_URL = "https://knbyyykfwwlgnizutqyb.supabase.co/functions/v1/dg-tgc-fulfill";
+const TGC_ORDER_URL = "https://knbyyykfwwlgnizutqyb.supabase.co/functions/v1/dg-tgc-order";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -81,6 +94,44 @@ async function fetchAndCover(url: string, w: number, h: number) {
   const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
   const img = await Image.decode(bytes);
   return img.cover(w, h);
+}
+
+// The card art alone doesn't tell the actor what to act out — a charades card
+// is useless without the prompt printed on it. Composites a caption band across
+// the bottom of the cropped card face: the scene category (small, accent) and
+// the actual phrase to act out (large, wrapped), on a solid panel so it stays
+// readable over any art.
+const CAPTION_H = 220;
+async function composeCardFace(
+  fontBytes: Uint8Array,
+  theme: (typeof STYLE_THEMES)[string],
+  img: InstanceType<typeof Image>,
+  category: string,
+  phrase: string,
+): Promise<Uint8Array> {
+  const band = new Image(CARD_W, CAPTION_H);
+  band.fill(theme.panelBg);
+  img.composite(band, 0, CARD_H - CAPTION_H);
+
+  const catImg = Image.renderText(
+    fontBytes,
+    24,
+    category.toUpperCase(),
+    theme.accent,
+    new TextLayout({ maxWidth: CARD_W - 60, maxHeight: 36, wrapStyle: "word", verticalAlign: "center" }),
+  );
+  img.composite(catImg, 30, CARD_H - CAPTION_H + 14);
+
+  const phraseImg = Image.renderText(
+    fontBytes,
+    38,
+    phrase,
+    theme.text,
+    new TextLayout({ maxWidth: CARD_W - 60, maxHeight: CAPTION_H - 60, wrapStyle: "word", verticalAlign: "center" }),
+  );
+  img.composite(phraseImg, 30, CARD_H - CAPTION_H + 56);
+
+  return await img.encode();
 }
 
 // ---------------- Per-style visual identity ----------------
@@ -335,6 +386,22 @@ async function buildInstructionsPdf(
   return await pdf.save({ useObjectStreams: false });
 }
 
+type FulfillState = {
+  game_id: string;
+  game_edit_uri?: string;
+  deck_id: string;
+  folder_id: string;
+  subject_name: string;
+  next_index: number;
+  uploaded: { name: string; face_id: string }[];
+  failures: { idx: number; error: string }[];
+  tuckbox_id?: string;
+  document_id?: string;
+  box_file_id?: string | null;
+  pdf_file_id?: string | null;
+  completed?: boolean;
+};
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
@@ -353,7 +420,9 @@ Deno.serve(async (req: Request) => {
   // verify_jwt only checks that SOME valid Supabase JWT was sent — the public anon
   // key (embedded client-side on every page) satisfies that. This function creates
   // real objects in the TGC account, so it additionally requires the admin secret,
-  // making it callable only by whoever is manually triggering fulfillment.
+  // making it callable only by whoever is manually triggering fulfillment, or by
+  // trusted server-side callers (dg-deck-batch, and this function chaining itself)
+  // that fetch the same secret from the vault before calling.
   const { data: adminSecret } = await supabase.rpc("dg_get_secret", { secret_name: "DG_ADMIN_SECRET" });
   if (!adminSecret || req.headers.get("x-admin-secret") !== adminSecret) {
     return json({ error: "unauthorized" }, 401);
@@ -367,65 +436,113 @@ Deno.serve(async (req: Request) => {
   }
   if (!Array.isArray(order.deck_art) || !order.deck_art.length) return json({ error: "no deck art" }, 400);
 
-  const { data: sessionId } = await supabase.rpc("dg_get_secret", { secret_name: "TGC_SESSION_ID" });
-  const { data: designerId } = await supabase.rpc("dg_get_secret", { secret_name: "TGC_DESIGNER_ID" });
-  const { data: userId } = await supabase.rpc("dg_get_secret", { secret_name: "TGC_USER_ID" });
-  if (!sessionId || !designerId || !userId) return json({ error: "TGC not configured" }, 500);
+  const entries = order.deck_art as { category: string; prompt: string; art_url: string }[];
+  // Resume from persisted state rather than trusting a caller-supplied index —
+  // makes retries/duplicate triggers safe instead of creating a second Game.
+  let state: FulfillState | null = (order.tgc_fulfill_state as FulfillState | null) ?? null;
+  if (state?.completed) {
+    return json({ ok: true, already_done: true, game_id: state.game_id, note: "dg-tgc-fulfill already completed for this order." });
+  }
 
   const artStyle = STYLE_THEMES[order.art_style] ? order.art_style : "renaissance";
   const theme = STYLE_THEMES[artStyle];
 
   try {
-    const user = await tgc(sessionId, `/user/${userId}`);
-    const folderId = user.root_folder_id;
-    const subjectName = subjectNameFromStyle(order.style);
+    const { data: sessionId } = await supabase.rpc("dg_get_secret", { secret_name: "TGC_SESSION_ID" });
+    const { data: designerId } = await supabase.rpc("dg_get_secret", { secret_name: "TGC_DESIGNER_ID" });
+    const { data: userId } = await supabase.rpc("dg_get_secret", { secret_name: "TGC_USER_ID" });
+    if (!sessionId || !designerId || !userId) return json({ error: "TGC not configured" }, 500);
 
-    const game = await tgc(sessionId, "/game", "POST", {
-      name: `Parlour Deck — ${subjectName} (order ${orderId.slice(0, 8)})`,
-      designer_id: designerId,
-      description: order.instructions_copy || "",
-    });
-
-    const deck = await tgc(sessionId, "/deck", "POST", {
-      name: "Parlour Deck",
-      game_id: game.id,
-      identity: "PokerDeck",
-    });
-
-    const entries = order.deck_art as { category: string; prompt: string; art_url: string }[];
-    const cardsPayload: { name: string; face_id: string }[] = [];
-    const failures: { idx: number; error: string }[] = [];
-
-    async function uploadOne(idx: number, entry: { prompt: string; art_url: string }) {
-      const cropped = await fetchAndCover(entry.art_url, CARD_W, CARD_H);
-      const png = await cropped.encode();
-      const file = await tgcUploadFile(sessionId, folderId, `card-${String(idx).padStart(2, "0")}.png`, png, "image/png");
-      cardsPayload.push({ name: entry.prompt.slice(0, 60), face_id: file.id });
+    // ---- First hop only: create the Game + Deck once, init resumable state ----
+    if (!state) {
+      const user = await tgc(sessionId, `/user/${userId}`);
+      const subjectName = subjectNameFromStyle(order.style);
+      const game = await tgc(sessionId, "/game", "POST", {
+        name: `Parlour Deck — ${subjectName} (order ${orderId.slice(0, 8)})`,
+        designer_id: designerId,
+        description: order.instructions_copy || "",
+      });
+      const deck = await tgc(sessionId, "/deck", "POST", {
+        name: "Parlour Deck",
+        game_id: game.id,
+        identity: "PokerDeck",
+      });
+      state = {
+        game_id: game.id,
+        game_edit_uri: game.edit_uri,
+        deck_id: deck.id,
+        folder_id: user.root_folder_id,
+        subject_name: subjectName,
+        next_index: 0,
+        uploaded: [],
+        failures: [],
+      };
+      await supabase.from("dg_orders").update({ tgc_fulfill_state: state }).eq("id", orderId);
     }
 
-    for (let i = 0; i < entries.length; i += UPLOAD_CONCURRENCY) {
-      const chunk = entries.slice(i, i + UPLOAD_CONCURRENCY);
-      const settled = await Promise.allSettled(chunk.map((e, j) => uploadOne(i + j, e)));
+    // ---- Card uploads: one small batch per invocation, then chain to a fresh
+    // invocation for the next one (see file header for why UPLOAD_CONCURRENCY
+    // per invocation, never more, is the safe boundary).
+    if (state.next_index < entries.length) {
+      const cardFontBytes = new Uint8Array(await (await fetch(theme.fontUrl)).arrayBuffer());
+      const startIdx = state.next_index;
+      const batch = entries.slice(startIdx, startIdx + UPLOAD_CONCURRENCY);
+      const folderId = state.folder_id;
+
+      async function uploadOne(idx: number, entry: { category: string; prompt: string; art_url: string }) {
+        const cropped = await fetchAndCover(entry.art_url, CARD_W, CARD_H);
+        const captioned = await composeCardFace(cardFontBytes, theme, cropped, entry.category, entry.prompt);
+        const file = await tgcUploadFile(sessionId, folderId, `card-${String(idx).padStart(2, "0")}.png`, captioned, "image/png");
+        return { name: entry.prompt.slice(0, 60), face_id: file.id };
+      }
+
+      const settled = await Promise.allSettled(batch.map((e, j) => uploadOne(startIdx + j, e)));
       settled.forEach((r, j) => {
-        if (r.status === "rejected") failures.push({ idx: i + j, error: String(r.reason?.message ?? r.reason) });
+        if (r.status === "fulfilled") state!.uploaded.push(r.value);
+        else {
+          const reason = (r as PromiseRejectedResult).reason;
+          state!.failures.push({ idx: startIdx + j, error: String(reason?.message ?? reason) });
+        }
+      });
+      state.next_index = startIdx + batch.length;
+      await supabase.from("dg_orders").update({ tgc_fulfill_state: state }).eq("id", orderId);
+
+      // Chain forward to a fresh invocation — including the finalize-only hop
+      // once every card is uploaded, so finalize never shares a worker with a
+      // card-upload batch. Awaited (not fire-and-forget) so the request actually
+      // goes out before this invocation's response ends its lifecycle.
+      const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      await fetch(SELF_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${svcKey}`, "x-admin-secret": adminSecret },
+        body: JSON.stringify({ order_id: orderId }),
+      }).catch(() => {});
+
+      return json({
+        ok: true,
+        batch_done: true,
+        uploaded_so_far: state.uploaded.length,
+        failed_so_far: state.failures.length,
+        next_index: state.next_index,
+        total: entries.length,
       });
     }
 
+    // ---- Finalize: bulk-create Cards, TuckBox + Document, box art + PDF ----
     let bulkResult: any = null;
-    for (let i = 0; i < cardsPayload.length; i += 100) {
-      const chunk = cardsPayload.slice(i, i + 100);
-      bulkResult = await tgc(sessionId, `/deck/${deck.id}/bulk-cards`, "POST", { cards: JSON.stringify(chunk) });
+    for (let i = 0; i < state.uploaded.length; i += 100) {
+      const chunk = state.uploaded.slice(i, i + 100);
+      bulkResult = await tgc(sessionId, `/deck/${state.deck_id}/bulk-cards`, "POST", { cards: JSON.stringify(chunk) });
     }
 
     const tuckbox = await tgc(sessionId, "/tuckbox", "POST", {
       name: "Parlour Deck Box",
-      game_id: game.id,
+      game_id: state.game_id,
       identity: "PokerTuckBox54",
     });
-
     const document = await tgc(sessionId, "/document", "POST", {
       name: "House Rules",
-      game_id: game.id,
+      game_id: state.game_id,
       identity: "SmallBooklet",
     });
 
@@ -438,42 +555,68 @@ Deno.serve(async (req: Request) => {
       const frontArtImg = await Image.decode(
         new Uint8Array(await (await fetch(entries[0].art_url)).arrayBuffer()),
       );
-      const boxPng = await buildTuckBoxOutside(theme, frontArtImg, subjectName, order.about_text ?? null);
-      const boxFile = await tgcUploadFile(sessionId, folderId, "tuckbox-outside.png", boxPng, "image/png");
+      const boxPng = await buildTuckBoxOutside(theme, frontArtImg, state.subject_name, order.about_text ?? null);
+      const boxFile = await tgcUploadFile(sessionId, state.folder_id, "tuckbox-outside.png", boxPng, "image/png");
       boxFileId = boxFile.id;
       await tgc(sessionId, `/tuckbox/${tuckbox.id}`, "PUT", { outside_id: boxFileId });
 
       const cardCoverPng = await (await fetchAndCover(entries[0].art_url, CARD_W, CARD_H)).encode();
       const pdfBytes = await buildInstructionsPdf(
         theme,
-        subjectName,
+        state.subject_name,
         order.instructions_copy || `The Parlour Deck. ${theme.tagline}`,
         cardCoverPng,
       );
-      const pdfFile = await tgcUploadFile(sessionId, folderId, "house-rules.pdf", pdfBytes, "application/pdf");
+      const pdfFile = await tgcUploadFile(sessionId, state.folder_id, "house-rules.pdf", pdfBytes, "application/pdf");
       pdfFileId = pdfFile.id;
       await tgc(sessionId, `/document/${document.id}`, "PUT", { pdf_id: pdfFileId });
     } catch (e) {
-      failures.push({ idx: -1, error: `box/pdf: ${String((e as Error)?.message ?? e)}` });
+      state.failures.push({ idx: -1, error: `box/pdf: ${String((e as Error)?.message ?? e)}` });
     }
 
-    await supabase.from("dg_orders").update({ tgc_game_id: game.id }).eq("id", orderId);
+    state.tuckbox_id = tuckbox.id;
+    state.document_id = document.id;
+    state.box_file_id = boxFileId;
+    state.pdf_file_id = pdfFileId;
+    state.completed = true;
+    await supabase.from("dg_orders").update({ tgc_fulfill_state: state, tgc_game_id: state.game_id }).eq("id", orderId);
+
+    // ---- Auto-chain a dry-run cart preview via dg-tgc-order — strictly
+    // read-only against TGC (reports cart total vs current shop-credit balance).
+    // NEVER passes confirm:true here: placing the real paid order stays a
+    // deliberate, separate, human-triggered action, gated on shop credit being
+    // funded by hand (no TGC API exists to fund it).
+    let orderPreview: any = null;
+    try {
+      const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const res = await fetch(TGC_ORDER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${svcKey}`, "x-admin-secret": adminSecret },
+        body: JSON.stringify({ order_id: orderId }),
+      });
+      orderPreview = await res.json();
+      await supabase.from("dg_orders").update({ tgc_order_preview: orderPreview }).eq("id", orderId);
+    } catch (e) {
+      orderPreview = { error: String((e as Error)?.message ?? e) };
+    }
 
     return json({
       ok: true,
-      game_id: game.id,
-      game_edit_uri: game.edit_uri,
-      deck_id: deck.id,
+      finalized: true,
+      game_id: state.game_id,
+      game_edit_uri: state.game_edit_uri,
+      deck_id: state.deck_id,
       tuckbox_id: tuckbox.id,
       document_id: document.id,
       box_file_id: boxFileId,
       pdf_file_id: pdfFileId,
       art_style: artStyle,
-      cards_uploaded: cardsPayload.length,
-      cards_failed: failures.length,
-      failures,
+      cards_uploaded: state.uploaded.length,
+      cards_failed: state.failures.length,
+      failures: state.failures,
       bulk_result: bulkResult,
-      note: "Private draft only — nothing added to cart or ordered. Review in TGC dashboard before proceeding.",
+      order_preview: orderPreview,
+      note: "Game/Deck/Cards/Box/Document built; cart preview run in dry-run mode (see order_preview) — nothing charged. Call dg-tgc-order with confirm:true to place the real paid order once shop credit is funded.",
     });
   } catch (e) {
     return json({ error: String((e as Error)?.message ?? e) }, 500);

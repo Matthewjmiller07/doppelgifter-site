@@ -298,9 +298,32 @@ async function processBatch(
       if (buyerEmail) {
         await sendDeckReadyEmail(supabase, buyerEmail, orderId, results.length, totalFailed, instructionsCopy);
       }
+      await triggerTgcFulfill(supabase, orderId);
     }
   } catch (_e) {
     await supabase.from("dg_orders").update({ deck_status: "failed" }).eq("id", orderId);
+  }
+}
+
+// Auto-kicks off TGC fulfillment (Game/Deck/Cards/Box/Document build, then a
+// dry-run cart preview) the moment deck_status actually reaches ready/partial —
+// this is the real completion hook, not dg-webhook, since dg-webhook's own
+// request/response already finished long before the render chain above gets
+// here. dg-tgc-fulfill chains itself across further invocations for the 48-card
+// upload; this just fires the first hop and never blocks on the rest, and must
+// never throw back into the render pipeline above (added 2026-07-24).
+async function triggerTgcFulfill(supabase: any, orderId: string) {
+  try {
+    const { data: adminSecret } = await supabase.rpc("dg_get_secret", { secret_name: "DG_ADMIN_SECRET" });
+    if (!adminSecret) return;
+    const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    await fetch("https://knbyyykfwwlgnizutqyb.supabase.co/functions/v1/dg-tgc-fulfill", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${svcKey}`, "x-admin-secret": adminSecret },
+      body: JSON.stringify({ order_id: orderId }),
+    });
+  } catch (_) {
+    // TGC automation failures must never surface as a render-pipeline failure.
   }
 }
 
