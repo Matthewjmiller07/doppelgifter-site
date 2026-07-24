@@ -6,7 +6,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const PRINTIFY = { shop: 22195433, blueprint: 68, provider: 1, variant: 33719 };
-const AUTO_PRODUCE = false; // keep false in test mode: orders wait as drafts, no charges
+const AUTO_PRODUCE = true; // live 2026-07-24: paid mug orders auto-send to Printify production
 
 const PRODUCT_NAMES: Record<string, string> = {
   mug: "The Ceremonial Mug",
@@ -25,6 +25,16 @@ const PRODUCT_QUIPS: Record<string, string> = {
   cards: "the atelier is now painting all 48 scenes of them, one at a time — a second email lands when the gallery is ready",
 };
 const DECK_PRODUCTS = new Set(["deck", "cards"]);
+
+// Referral program (added 2026-07-24): every buyer with a shipping address gets a
+// personal 15%-off code to share; when a friend redeems it, the referrer gets a free
+// die-cut sticker mailed to them. Coupon created once via the Stripe API, reused by
+// every personal promotion code (one coupon, many codes -> per-referrer tracking
+// lives in dg_referrals, not in Stripe).
+const REFERRAL_COUPON_ID = "VP5YlOiy"; // "Referral Friend Discount", 15% off, once
+const REFERRAL_STICKER = { blueprint: 400, provider: 1, variant: 45749 }; // 3"x3" kiss-cut sticker: $1.66 cost + $4.29 ship
+const REFERRAL_STICKER_ART = "https://doppelgifter.com/ads/ad-feed-hero.jpg";
+const MAX_REFERRAL_REWARDS = 10; // cap free swag per referrer so this can't be farmed
 
 function subjectNameFromStyle(style: unknown): string {
   const m = /starring\s+(.+)$/i.exec(String(style ?? ""));
@@ -93,6 +103,205 @@ async function sendConfirmationEmail(supabase: any, s: any, orderId: string) {
     });
   } catch (_) {
     // email failure must never block fulfillment
+  }
+}
+
+async function sendReferralEmail(supabase: any, to: string, firstName: string, code: string) {
+  try {
+    const { data: brevoKey } = await supabase.rpc("dg_get_secret", { secret_name: "BREVO_API_KEY" });
+    if (!brevoKey) return;
+    const html = `
+<div style="background:#F5F1E6;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;color:#1E3329;">
+  <div style="max-width:560px;margin:0 auto;background:#FDFBF4;border:1px solid #D8D0BC;border-radius:6px;padding:32px;">
+    <p style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#A87F1F;margin:0 0 12px;">DoppelGifter · Fine Commemorative Goods</p>
+    <h1 style="font-size:26px;margin:0 0 16px;font-weight:normal;">One more thing, ${firstName}.</h1>
+    <p style="font-size:16px;line-height:1.6;margin:0 0 20px;">Know someone else who needs their face on something? Send them this code — they get 15% off, and when they use it, we mail <b>you</b> a free DoppelGifter sticker. No limit on friends, up to ${MAX_REFERRAL_REWARDS} stickers total.</p>
+    <p style="text-align:center;margin:0 0 20px;"><span style="display:inline-block;font-size:22px;letter-spacing:2px;background:#1E3329;color:#EDE6D3;padding:12px 24px;border-radius:4px;">${code}</span></p>
+    <p style="font-size:13px;color:#52655B;line-height:1.6;margin:0;">doppelgifter.com — paste the code at checkout.</p>
+  </div>
+  <p style="text-align:center;font-size:11px;color:#52655B;margin:16px 0 0;">DoppelGifter · doppelgifter.com · Their face. On stuff.</p>
+</div>`;
+    await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "api-key": brevoKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sender: { name: "The Atelier at DoppelGifter", email: "matthew@doppelgifter.com" },
+        replyTo: { name: "Matthew at DoppelGifter", email: "hello@doppelgifter.com" },
+        to: [{ email: to }],
+        subject: "Your friends get 15% off. You get a free sticker.",
+        htmlContent: html,
+      }),
+    });
+  } catch (_) {
+    // email failure must never block the referral record itself
+  }
+}
+
+function referralCodeFrom(name: string, email: string): string {
+  const base = (name.split(" ")[0] || email.split("@")[0] || "FRIEND")
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 8) || "FRIEND";
+  const suffix = crypto.randomUUID().replace(/-/g, "").slice(0, 4).toUpperCase();
+  return base + suffix;
+}
+
+// Mints a personal referral code for a first-time buyer with a usable shipping
+// address. One Stripe promotion code per referrer, all sharing REFERRAL_COUPON_ID;
+// the mapping (code -> referrer + their shipping address, for the eventual reward
+// shipment) lives in dg_referrals since Stripe has no concept of "reward the sharer."
+async function mintReferralCode(supabase: any, sk: string, orderId: string, buyerEmail: string, s: any) {
+  const addr = s.shipping_details?.address ?? s.customer_details?.address;
+  if (!addr) return; // no shipping address on file -> nowhere to mail a reward, skip
+  const fullName = s.shipping_details?.name ?? s.customer_details?.name ?? "Friend";
+  const firstName = String(fullName).split(" ")[0] || "Friend";
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const code = referralCodeFrom(fullName, buyerEmail);
+    const res = await fetch("https://api.stripe.com/v1/promotion_codes", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${sk}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ coupon: REFERRAL_COUPON_ID, code }),
+    });
+    const pc = await res.json();
+    if (res.ok && pc?.id) {
+      await supabase.from("dg_referrals").insert({
+        code,
+        stripe_promo_id: pc.id,
+        referrer_email: buyerEmail.toLowerCase(),
+        referrer_name: fullName,
+        referrer_order_id: orderId,
+        shipping_address: {
+          name: fullName,
+          address1: addr.line1 ?? "",
+          address2: addr.line2 ?? "",
+          city: addr.city ?? "",
+          region: addr.state ?? "",
+          zip: addr.postal_code ?? "",
+          country: addr.country ?? "US",
+          phone: s.customer_details?.phone ?? "",
+        },
+      });
+      await sendReferralEmail(supabase, buyerEmail, firstName, code);
+      return;
+    }
+    // code string collision -> retry with a fresh random suffix; any other error -> give up quietly
+    if (pc?.error?.code !== "resource_already_exists") return;
+  }
+}
+
+// Ships a free thank-you sticker to a referrer whose code a friend just redeemed.
+// Mirrors the mug fulfillment pattern below (upload art -> create product -> create
+// order -> send to production) at a much smaller scale.
+async function rewardReferrer(supabase: any, pkey: string, referral: any) {
+  try {
+    const H = {
+      Authorization: `Bearer ${pkey}`,
+      "Content-Type": "application/json",
+      "User-Agent": "DoppelGifter/0.1 (+https://doppelgifter.com)",
+    };
+    const up = await (
+      await fetch("https://api.printify.com/v1/uploads/images.json", {
+        method: "POST",
+        headers: H,
+        body: JSON.stringify({ file_name: "referral-sticker.jpg", url: REFERRAL_STICKER_ART }),
+      })
+    ).json();
+    if (!up?.id) return;
+
+    const prod = await (
+      await fetch(`https://api.printify.com/v1/shops/22195433/products.json`, {
+        method: "POST",
+        headers: H,
+        body: JSON.stringify({
+          title: `Referral thank-you sticker — ${referral.referrer_name ?? "friend"}`,
+          description: "DoppelGifter referral reward",
+          blueprint_id: REFERRAL_STICKER.blueprint,
+          print_provider_id: REFERRAL_STICKER.provider,
+          variants: [{ id: REFERRAL_STICKER.variant, price: 100, is_enabled: true }],
+          print_areas: [
+            {
+              variant_ids: [REFERRAL_STICKER.variant],
+              placeholders: [{ position: "front", images: [{ id: up.id, x: 0.5, y: 0.5, scale: 1, angle: 0 }] }],
+            },
+          ],
+        }),
+      })
+    ).json();
+    if (!prod?.id) return;
+
+    const addr = referral.shipping_address ?? {};
+    const nameParts = String(addr.name ?? referral.referrer_name ?? "Friend").split(" ");
+    const order = await (
+      await fetch(`https://api.printify.com/v1/shops/22195433/orders.json`, {
+        method: "POST",
+        headers: H,
+        body: JSON.stringify({
+          external_id: `referral-${referral.id}-${Date.now()}`,
+          label: `referral-${referral.code}`,
+          line_items: [{ product_id: prod.id, variant_id: REFERRAL_STICKER.variant, quantity: 1 }],
+          shipping_method: 1,
+          send_shipping_notification: true,
+          address_to: {
+            first_name: nameParts[0],
+            last_name: nameParts.slice(1).join(" ") || "-",
+            email: referral.referrer_email,
+            phone: addr.phone ?? "",
+            country: addr.country ?? "US",
+            region: addr.region ?? "",
+            address1: addr.address1 ?? "",
+            address2: addr.address2 ?? "",
+            city: addr.city ?? "",
+            zip: addr.zip ?? "",
+          },
+        }),
+      })
+    ).json();
+    if (!order?.id) return;
+
+    await fetch(
+      `https://api.printify.com/v1/shops/22195433/orders/${order.id}/send_to_production.json`,
+      { method: "POST", headers: H },
+    );
+
+    await supabase
+      .from("dg_referrals")
+      .update({ reward_count: referral.reward_count + 1, last_reward_at: new Date().toISOString() })
+      .eq("id", referral.id);
+  } catch (_) {
+    // reward failures must never block the primary order's own fulfillment
+  }
+}
+
+// Entry point: mint a code for a first-time buyer, and/or reward whoever's code this
+// order just redeemed. Both halves are independently best-effort — a Stripe or
+// Printify hiccup here must never affect the paying customer's own order.
+async function handleReferralProgram(supabase: any, s: any, orderId: string, buyerEmail: string) {
+  try {
+    const { data: sk } = await supabase.rpc("dg_get_secret", { secret_name: "STRIPE_SECRET_KEY" });
+    if (sk) {
+      const { data: already } = await supabase
+        .from("dg_referrals")
+        .select("id")
+        .eq("referrer_email", buyerEmail.toLowerCase())
+        .maybeSingle();
+      if (!already) await mintReferralCode(supabase, sk, orderId, buyerEmail, s);
+    }
+
+    const usedCode = s.metadata?.promo;
+    if (usedCode) {
+      const { data: referral } = await supabase
+        .from("dg_referrals")
+        .select("*")
+        .eq("code", usedCode)
+        .maybeSingle();
+      if (referral && referral.referrer_email !== buyerEmail.toLowerCase() && referral.reward_count < MAX_REFERRAL_REWARDS) {
+        const { data: pkey } = await supabase.rpc("dg_get_secret", { secret_name: "PRINTIFY_API_KEY" });
+        if (pkey) await rewardReferrer(supabase, pkey, referral);
+      }
+    }
+  } catch (_) {
+    // referral-program failures must never block order fulfillment
   }
 }
 
@@ -175,6 +384,13 @@ Deno.serve(async (req: Request) => {
     };
     if (s.metadata?.session_key) lead.session_key = s.metadata.session_key;
     await supabase.from("dg_leads").upsert(lead, { onConflict: "email" });
+
+    // Referral program: runs for every product, in the background, never blocking
+    // this order's own fulfillment response.
+    const referralBg = handleReferralProgram(supabase, s, orderId, buyerEmail);
+    const referralRt = (globalThis as any).EdgeRuntime;
+    if (referralRt?.waitUntil) referralRt.waitUntil(referralBg);
+    else await referralBg;
   }
 
   if (s.metadata?.product !== "mug") {

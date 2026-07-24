@@ -5,8 +5,8 @@ const PRICES: Record<string, { cents: number; name: string }> = {
   tee: { cents: 3499, name: "The Monument Tee" },
   blanket: { cents: 6499, name: "The Heirloom Blanket" },
   poster: { cents: 4499, name: "The Gallery Poster" },
-  deck: { cents: 2499, name: "The Parlour Deck (54 cards)" },
-  cards: { cents: 2499, name: "The Parlour Deck (54 cards)" }, // homepage alias for deck
+  deck: { cents: 3999, name: "The Parlour Deck (54 cards)" },
+  cards: { cents: 3999, name: "The Parlour Deck (54 cards)" }, // homepage alias for deck
 };
 // Products whose fulfillment renders a full personalized deck after purchase (see dg-webhook).
 const DECK_PRODUCTS = new Set(["deck", "cards"]);
@@ -149,6 +149,13 @@ Deno.serve(async (req: Request) => {
     if (!promo) return json({ error: "That code means nothing to the atelier." }, 400);
   }
 
+  const baseCents = PRICES[product].cents + (digital ? DIGITAL_CENTS : 0);
+  const discountedCents = promo
+    ? promo.percentOff
+      ? Math.round(baseCents * (1 - promo.percentOff / 100))
+      : Math.max(0, baseCents - promo.amountOff)
+    : baseCents;
+
   const { data: order, error: orderErr } = await supabase
     .from("dg_orders")
     .insert({
@@ -156,8 +163,8 @@ Deno.serve(async (req: Request) => {
       art_style: artStyle,
       about_text: aboutText,
       product,
-      price_cents: PRICES[product].cents + (digital ? DIGITAL_CENTS : 0) -
-        (promo?.amountOff ?? 0),
+      price_cents: discountedCents,
+      promo_code: promo?.code ?? null,
       status: "pending",
       preview_url: validUrl(preview_url) ? preview_url : art_url,
       print_url: art_url,
@@ -207,6 +214,8 @@ Deno.serve(async (req: Request) => {
     p.set("allow_promotion_codes", "true");
   }
   p.set("shipping_address_collection[allowed_countries][0]", "US");
+  // TGC's Address API requires phone_number; Stripe doesn't collect it by default.
+  p.set("phone_number_collection[enabled]", "true");
   p.set("shipping_options[0][shipping_rate_data][display_name]", "Standard shipping");
   p.set("shipping_options[0][shipping_rate_data][type]", "fixed_amount");
   p.set("shipping_options[0][shipping_rate_data][fixed_amount][amount]", String(SHIPPING_CENTS));
