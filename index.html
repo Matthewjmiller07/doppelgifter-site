@@ -202,6 +202,17 @@
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--gilt-bright) 22%, transparent);
   }
   .choice img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+  .newtag {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #fff; background: var(--seal);
+    padding: 2px 6px; border-radius: 3px; vertical-align: middle; margin-left: 4px;
+  }
+  #scribeExtras {
+    display: none; margin-top: 22px; padding: 16px 18px; border: 1px solid var(--gilt);
+    border-radius: 6px; background: var(--ground-raise); max-width: 640px;
+  }
+  #scribeExtras b { font-family: "Palatino", "Iowan Old Style", "Book Antiqua", Georgia, serif; font-weight: 500; font-size: 18px; }
+  #scribeExtras p { margin: 6px 0 12px; color: var(--ink-soft); font-size: 15px; }
   .choice .cname { font-weight: 650; font-size: 16px; }
   .choice .cname .serif { font-size: 17px; }
   .choice .cdesc { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
@@ -389,6 +400,11 @@
         <span class="cname serif">The Marble Bust</span>
         <span class="cdesc">For friends who peaked in antiquity.</span>
       </button>
+      <button class="choice" data-style="The Scribe">
+        <img src="img/style-scribe.webp" width="420" height="420" loading="lazy" decoding="async" alt="Micrography portrait drawn entirely out of tiny handwritten words">
+        <span class="cname serif">The Scribe <span class="newtag">New</span></span>
+        <span class="cdesc">Drawn entirely out of what you wrote about them. Every line is a sentence.</span>
+      </button>
     </div>
     <div style="margin-top:26px;">
       <label class="okline" for="captionInput" style="display:block; margin-bottom:6px;"><b>Add an inscription</b> — optional, hand-lettered beneath their likeness</label>
@@ -438,6 +454,11 @@
         <span class="cname">The Parlour Deck · Custom Charades <span class="price"><s style="opacity:.55;font-weight:500;margin-right:4px;">$54.99</s>$39.99</span></span>
         <span class="cdesc">A charades game where every card stars their face. 54 scenes of them, linen finish, gilt tuck box.</span>
       </button>
+    </div>
+    <div id="scribeExtras">
+      <b>📜 Scribe-only commissions</b>
+      <p>A portrait made of words deserves better than a mug (though the mug is excellent). Matted and framed behind glass, a fine-art print, or a phone case that quotes them every time you drop it.</p>
+      <a class="btn ghost" id="scribeExtrasLink" href="scripture.html" style="text-decoration:none">Frame it, print it, or case it →</a>
     </div>
     <div id="livePrev4" style="display:none; margin-top:24px; max-width:230px; position:relative;">
       <img class="framed" id="prev4Img" alt="Live product mockup" style="aspect-ratio:1/1; object-fit:cover;">
@@ -699,13 +720,25 @@
       return;
     }
     document.getElementById("prev3Img").src = state.photo;
-    veil("veilPrev3", "🎨 Painting… ~30s");
+    veil("veilPrev3", STYLE_KEYS[state.style] === "micrography" ? "📜 Inscribing… ~10s" : "🎨 Painting… ~30s");
     ensureArt().then(function (art) {
       document.getElementById("prev3Img").src = art;
       veil("veilPrev3", false);
     }).catch(function (e) {
       veil("veilPrev3", e.code === 402 ? "📧 Email needed — continue →" : "😔 " + e.message);
     });
+  });
+  function syncScribeExtras() {
+    document.getElementById("scribeExtras").style.display = STYLE_KEYS[state.style] === "micrography" ? "block" : "none";
+  }
+  document.querySelectorAll("#styleGrid .choice").forEach(function (c) { c.addEventListener("click", syncScribeExtras); });
+  document.getElementById("scribeExtrasLink").addEventListener("click", function (e) {
+    if (scribeDraft) return;                       // already has ?d=
+    e.preventDefault();
+    var a = this;
+    a.textContent = "Inscribing first…";
+    ensureArt().then(function () { location.href = a.href; })
+      .catch(function () { a.textContent = "Upload their photo first →"; });
   });
   wireGrid("giftGrid", "giftNext", function (c) {
     state.gift = c.dataset.gift;
@@ -787,7 +820,7 @@
   function dgUtm() { try { return localStorage.dgUtm || undefined; } catch (e) { return undefined; } }
   var urlPromo = null;
   try { urlPromo = new URLSearchParams(location.search).get("code"); } catch (e) {}
-  var STYLE_KEYS = { "The Renaissance Noble": "renaissance", "The Saturday Cartoon": "cartoon", "The '85 Glamour Shot": "glamour", "The Marble Bust": "marble" };
+  var STYLE_KEYS = { "The Renaissance Noble": "renaissance", "The Saturday Cartoon": "cartoon", "The '85 Glamour Shot": "glamour", "The Marble Bust": "marble", "The Scribe": "micrography" };
   var GIFT_KEYS = { "The Ceremonial Mug": "mug", "The Monument Tee": "tee", "The Heirloom Blanket": "blanket", "The Gallery Poster": "poster", "The Parlour Deck": "cards" };
   var artPromise = null, artStyle = null, mockCache = {}, mockPromises = {}, lastArt = null;
   var DEMO_MOCKS = { mug: "demo/mug.jpg", tee: "demo/tee.jpg", poster: "demo/poster.jpg", blanket: "demo/blanket.jpg", cards: "demo/cards.jpg" };
@@ -804,7 +837,7 @@
       var aboutEl = document.getElementById("aboutText");
       localStorage.dgHandoff = JSON.stringify({
         photo: typeof state.photo === "string" && state.photo.indexOf("data:image/") === 0 ? state.photo : null,
-        style: STYLE_KEYS[state.style] || "renaissance",
+        style: (STYLE_KEYS[state.style] !== "micrography" && STYLE_KEYS[state.style]) || "renaissance",
         about: aboutEl ? aboutEl.value.trim().slice(0, 500) : "",
       });
     } catch (err) {}
@@ -978,6 +1011,17 @@
   function ensureArt() {
     var styleKey = STYLE_KEYS[state.style];
     if (artStyle !== styleKey) { artPromise = null; mockCache = {}; mockPromises = {}; lastArt = null; }
+    if (!artPromise && state.photo && styleKey === "micrography") {
+      artStyle = styleKey;
+      atelierStart("📜 Inscribing their likeness", 12);
+      artPromise = scribeArt().then(function (url) {
+        lastArt = url;
+        atelierDone("✓ Inscription ready");
+        refreshPanels();
+        return url;
+      });
+      artPromise.catch(function () { atelierDone("😔 The scribe's quill snapped"); });
+    }
     if (!artPromise && state.photo) {
       artStyle = styleKey;
       atelierStart("🎨 Painting their likeness", 35);
@@ -990,6 +1034,52 @@
       artPromise.catch(function () { atelierDone("😔 The atelier hiccuped"); });
     }
     return artPromise || Promise.reject(new Error("Upload a photo first"));
+  }
+
+  /* The Scribe: micrography drawn in the browser (js/micrography.js), then uploaded as a
+     draft so mockups, checkout, and the Prodigi storefront all see one https URL. */
+  var scribeDraft = null;
+  function scribeText() {
+    var about = (document.getElementById("aboutText").value || "").replace(/\s+/g, " ").trim();
+    var name = (about.match(/[A-Z][a-z]+/) || [""])[0];
+    return about || (name ? name + " the Magnificent" : "Their face. On stuff. A fine commemorative good");
+  }
+  function scribeArt() {
+    return import("./js/micrography.js").then(function (M) {
+      return new Promise(function (resolve, reject) {
+        var img = new Image();
+        img.onload = function () { resolve(img); };
+        img.onerror = function () { reject(new Error("couldn't read the photo")); };
+        img.src = state.photo;
+      }).then(function (img) {
+        // background removal is a nicety — if it can't find a person, draw the whole photo
+        return M.removeBackground(img).catch(function () { return img; });
+      }).then(function (src) {
+        return M.renderPortrait(src, { text: scribeText(), caption: state.caption, ink: "sepia", size: 2400 });
+      });
+    }).then(function (plate) {
+      return new Promise(function (r) { plate.toBlob(r, "image/jpeg", 0.9); }).then(function (blob) {
+        return fetch(CONFIG.url + "/functions/v1/dg-mg-draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
+          body: JSON.stringify({ action: "create", meta: {
+            title: state.caption || "The Scribe", text_ref: "", text_sample: scribeText().slice(0, 200),
+            technique: "engrave", ink: "sepia", ink_name: "Sepia", paper: "#ede0c4", width: plate.width, height: plate.height
+          } })
+        }).then(function (r) { return r.json(); }).then(function (d) {
+          if (!d.upload_url) throw new Error(d.error || "couldn't save the inscription");
+          var fd = new FormData();
+          fd.append("cacheControl", "3600");
+          fd.append("", blob, "plate.jpg");
+          return fetch(d.upload_url, { method: "PUT", headers: { "x-upsert": "false" }, body: fd }).then(function (up) {
+            if (!up.ok) throw new Error("upload failed (" + up.status + ")");
+            scribeDraft = d.id;
+            document.getElementById("scribeExtrasLink").href = "scripture.html?d=" + d.id;
+            return d.plate_url;
+          });
+        });
+      });
+    });
   }
 
   function ensureMock(giftKey) {
@@ -1148,7 +1238,7 @@
       try {
         localStorage.dgLastOrder = JSON.stringify({ img: mock || art, gift: state.gift, style: state.style });
       } catch (err) {}
-      var checkoutBody = { style: state.style, product: GIFT_KEYS[state.gift], art_url: art, preview_url: mock, email: dgEmail(), session_key: SKEY, utm: dgUtm(), digital: document.getElementById("digitalUp").checked, promo: state.promoCode || undefined };
+      var checkoutBody = { style: state.style, art_style: STYLE_KEYS[state.style], product: GIFT_KEYS[state.gift], art_url: art, preview_url: mock, email: dgEmail(), session_key: SKEY, utm: dgUtm(), digital: document.getElementById("digitalUp").checked, promo: state.promoCode || undefined };
       // The Parlour Deck renders all 48 scenes after purchase (see dg-webhook) — it
       // needs their actual face photo, not just the one style preview.
       if (GIFT_KEYS[state.gift] === "cards") checkoutBody.photo = state.photo;
