@@ -37,6 +37,9 @@ const AI_MOCKUPS: Record<string, string> = {
   poster: "Professional interior photograph of an 18x24 inch matte poster on a warm neutral wall showing the artwork from image 1, preserving any caption text exactly. Sharp focus, no added text.",
   blanket: "Professional lifestyle product photograph of a soft plush blanket draped over a sofa, printed with the artwork from image 1, preserving any caption text exactly. Sharp focus, no added text.",
   cards: "Professional product photography of a custom playing card deck on a neutral background, showing both the tuck box and several spread cards featuring the portrait from image 1 on their backs. Sharp focus, clean studio lighting.",
+  mg_print: "Professional interior photograph of a 12x16 inch fine-art matte paper print pinned to a warm plaster wall, showing the artwork from image 1, preserving any caption text exactly. Sharp focus, no added text.",
+  mg_framed: "Professional interior photograph of a 12x16 inch framed print with a white mat behind glass, hanging on a warm neutral wall, showing the artwork from image 1, preserving any caption text exactly. Sharp focus, no added text.",
+  mg_case: "Professional e-commerce product photograph of a glossy tough phone case seen from the back on a clean light studio background, printed edge to edge with the artwork from image 1. Sharp focus, no added text.",
 };
 
 const PRINTIFY_CFG: Record<string, { blueprint: number; provider: number; variant: number; scale: number; price: number }> = {
@@ -45,6 +48,17 @@ const PRINTIFY_CFG: Record<string, { blueprint: number; provider: number; varian
   blanket: { blueprint: 522, provider: 1, variant: 68323, scale: 1.0, price: 6499 },
   poster: { blueprint: 282, provider: 99, variant: 43144, scale: 1.0, price: 4499 },
   cards: { blueprint: 1138, provider: 28, variant: 87236, scale: 1.0, price: 2499 },
+  // Prodigi products (dg-prodigi-order fulfils them). Prodigi has no mockup API, so
+  // previews come from the closest Printify product, never ordered there. Scales
+  // match Prodigi's fillPrintArea: square art covering a 3:4 print / 3:5 case.
+  mg_print: { blueprint: 804, provider: 72, variant: 75290, scale: 1.34, price: 4400 },
+  mg_framed: { blueprint: 540, provider: 99, variant: 69664, scale: 1.34, price: 11900 },
+  mg_case: { blueprint: 269, provider: 99, variant: 112814, scale: 1.68, price: 3900 },
+};
+// Printify preview variant per Prodigi option (frame color / phone model)
+const PREVIEW_VARIANTS: Record<string, Record<string, number>> = {
+  mg_framed: { black: 69664, natural: 69671, white: 69678, gold: 69671 },
+  mg_case: { ip15: 103561, ip16: 112814, ip17: 130115, s24: 105527 },
 };
 
 const CORS = {
@@ -192,8 +206,9 @@ Deno.serve(async (req: Request) => {
     return supabase.storage.from("dg-art").getPublicUrl(path).data.publicUrl;
   }
 
-  async function printifyMockup(pkey: string, artUrl: string, productKey: string): Promise<string> {
-    const cfg = PRINTIFY_CFG[productKey];
+  async function printifyMockup(pkey: string, artUrl: string, productKey: string, option?: string): Promise<string> {
+    const base = PRINTIFY_CFG[productKey];
+    const cfg = { ...base, variant: (option && PREVIEW_VARIANTS[productKey]?.[option]) || base.variant };
     const H = {
       Authorization: `Bearer ${pkey}`,
       "Content-Type": "application/json",
@@ -297,7 +312,8 @@ Deno.serve(async (req: Request) => {
       for (const p of wanted) {
         try {
           if (!pkey) throw new Error("no printify key");
-          mockups[p] = await printifyMockup(pkey, art_url, p);
+          const option = typeof body.variants?.[p] === "string" ? body.variants[p] : undefined;
+          mockups[p] = await printifyMockup(pkey, art_url, p, option);
           await logRender(`mockup:${p}`, "printify", 0, "succeeded", mockups[p]);
         } catch (_e) {
           const { data: token } = await supabase.rpc("dg_get_secret", {
