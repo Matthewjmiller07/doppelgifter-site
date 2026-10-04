@@ -15,6 +15,9 @@ const PRODUCT_NAMES: Record<string, string> = {
   poster: "The Gallery Poster",
   deck: "The Parlour Deck (54 cards)",
   cards: "The Parlour Deck (54 cards)", // homepage alias for deck
+  mg_print: "The Scribe's Print",
+  mg_framed: "The Illuminated Frame",
+  mg_case: "The Pocket Psalter",
 };
 const PRODUCT_QUIPS: Record<string, string> = {
   mug: "a machine is now solemnly applying their face to 11 ounces of premium ceramic",
@@ -23,7 +26,36 @@ const PRODUCT_QUIPS: Record<string, string> = {
   poster: "their portrait is being pressed onto museum-grade matte paper, frame-ready",
   deck: "the atelier is now painting all 48 scenes of them, one at a time — a second email lands when the gallery is ready",
   cards: "the atelier is now painting all 48 scenes of them, one at a time — a second email lands when the gallery is ready",
+  mg_print: "several thousand very small letters are being pressed onto 200gsm fine-art paper, each one exactly where the scribe left it",
+  mg_framed: "several thousand very small letters are being printed, matted, and sealed behind glass like the relic they are",
+  mg_case: "a verse is being fused onto a tough case, so the phone you drop daily now quotes scripture on impact",
 };
+const MG_PRODUCTS = new Set(["mg_print", "mg_framed", "mg_case"]);
+
+// Hands a paid micrography order to dg-prodigi-order (Prodigi fulfillment). Separate
+// function so a Prodigi hiccup can never touch the mug/deck paths in this webhook.
+async function startProdigiOrder(supabase: any, orderId: string, s: any) {
+  const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  // Stripe moved shipping under collected_information in newer API versions.
+  const shipping = s.collected_information?.shipping_details ?? s.shipping_details ?? null;
+  const ship = {
+    name: shipping?.name ?? s.customer_details?.name ?? "",
+    email: s.customer_details?.email ?? "",
+    phone: s.customer_details?.phone ?? "",
+    address: shipping?.address ?? s.customer_details?.address ?? {},
+  };
+  try {
+    const res = await fetch("https://knbyyykfwwlgnizutqyb.supabase.co/functions/v1/dg-prodigi-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${svcKey}` },
+      body: JSON.stringify({ order_id: orderId, ship }),
+    });
+    if (!res.ok) console.error("dg-prodigi-order", res.status, await res.text());
+  } catch (e) {
+    console.error("dg-prodigi-order unreachable", String(e));
+    await supabase.from("dg_orders").update({ status: "failed" }).eq("id", orderId);
+  }
+}
 const DECK_PRODUCTS = new Set(["deck", "cards"]);
 
 // Referral program (added 2026-07-24): every buyer with a shipping address gets a
@@ -97,7 +129,9 @@ async function sendConfirmationEmail(supabase: any, s: any, orderId: string) {
         sender: { name: "The Atelier at DoppelGifter", email: "matthew@doppelgifter.com" },
         replyTo: { name: "Matthew at DoppelGifter", email: "hello@doppelgifter.com" },
         to: [{ email: to }],
-        subject: `It is done. ${productName} bearing their face is being forged. 🏺`,
+        subject: MG_PRODUCTS.has(product)
+          ? `It is done. ${productName} is being inscribed. 📜`
+          : `It is done. ${productName} bearing their face is being forged. 🏺`,
         htmlContent: html,
       }),
     });
@@ -395,6 +429,14 @@ Deno.serve(async (req: Request) => {
 
   if (s.metadata?.product !== "mug") {
     await sendConfirmationEmail(supabase, s, orderId);
+
+    if (MG_PRODUCTS.has(s.metadata?.product)) {
+      const bg = startProdigiOrder(supabase, orderId, s);
+      const rt = (globalThis as any).EdgeRuntime;
+      if (rt?.waitUntil) rt.waitUntil(bg);
+      else await bg;
+      return new Response("paid; sent to Prodigi", { status: 200 });
+    }
 
     if (DECK_PRODUCTS.has(s.metadata?.product)) {
       // Fall back to the single rendered art if no raw face photo was captured

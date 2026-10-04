@@ -7,7 +7,18 @@ const PRICES: Record<string, { cents: number; name: string }> = {
   poster: { cents: 4499, name: "The Gallery Poster" },
   deck: { cents: 3999, name: "The Parlour Deck (54 cards)" },
   cards: { cents: 3999, name: "The Parlour Deck (54 cards)" }, // homepage alias for deck
+  // Micrography (scripture.html) — fulfilled by Prodigi via dg-prodigi-order
+  mg_print: { cents: 4400, name: "The Scribe's Print (12×16 fine art)" },
+  mg_framed: { cents: 11900, name: "The Illuminated Frame (12×16, matted)" },
+  mg_case: { cents: 3900, name: "The Pocket Psalter (tough phone case)" },
 };
+// Allowed variants per micrography product; must match MG_PRODUCTS in dg-prodigi-order.
+const MG_VARIANTS: Record<string, string[]> = {
+  mg_print: ["standard"],
+  mg_framed: ["black", "natural", "white", "gold"],
+  mg_case: ["ip15", "ip16", "ip17", "s24"],
+};
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 // Products whose fulfillment renders a full personalized deck after purchase (see dg-webhook).
 const DECK_PRODUCTS = new Set(["deck", "cards"]);
 const DIGITAL_CENTS = 999;
@@ -138,6 +149,16 @@ Deno.serve(async (req: Request) => {
   if (!validUrl(art_url)) {
     return json({ error: "Missing or invalid art_url - render a preview first" }, 400);
   }
+  const isMg = product in MG_VARIANTS;
+  const variant = isMg && MG_VARIANTS[product].includes(body.variant) ? String(body.variant) : null;
+  const draftId = typeof body.draft_id === "string" && UUID.test(body.draft_id) ? body.draft_id : null;
+  if (isMg) {
+    // The print file must be one dg-mg-draft signed for, not an arbitrary URL.
+    const mgPrefix = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/dg-art/mg/`;
+    if (!variant) return json({ error: "Pick a size / model first" }, 400);
+    if (!art_url.startsWith(mgPrefix) || !draftId) return json({ error: "Invalid artwork" }, 400);
+    if (digital) return json({ error: "Digital add-on isn't available for scripture pieces" }, 400);
+  }
   if (DECK_PRODUCTS.has(product) && typeof photo === "string" && photo.length > MAX_PHOTO_B64) {
     return json({ error: "Photo too large - resize to 1024px first" }, 400);
   }
@@ -169,6 +190,7 @@ Deno.serve(async (req: Request) => {
       preview_url: validUrl(preview_url) ? preview_url : art_url,
       print_url: art_url,
       email: email ?? null,
+      variant,
     })
     .select()
     .single();
@@ -187,11 +209,12 @@ Deno.serve(async (req: Request) => {
   const p = new URLSearchParams();
   p.set("mode", "payment");
   p.set("client_reference_id", order.id);
+  const returnPage = isMg ? `/scripture.html?d=${draftId}&` : "/?";
   p.set(
     "success_url",
-    SITE + "/?order=success&sid={CHECKOUT_SESSION_ID}&oid=" + encodeURIComponent(order.id),
+    SITE + returnPage + "order=success&sid={CHECKOUT_SESSION_ID}&oid=" + encodeURIComponent(order.id),
   );
-  p.set("cancel_url", SITE + "/?order=cancelled");
+  p.set("cancel_url", SITE + returnPage + "order=cancelled");
   p.set("line_items[0][quantity]", "1");
   p.set("line_items[0][price_data][currency]", "usd");
   p.set("line_items[0][price_data][unit_amount]", String(PRICES[product].cents));
@@ -225,6 +248,7 @@ Deno.serve(async (req: Request) => {
   p.set("metadata[style]", String(style ?? ""));
   p.set("metadata[art_style]", artStyle);
   p.set("metadata[art_url]", art_url);
+  if (variant) p.set("metadata[variant]", variant);
   if (digital) p.set("metadata[digital]", "1");
   if (validUrl(preview_url)) p.set("metadata[preview_url]", preview_url);
   if (typeof session_key === "string" && session_key.length <= 64) {

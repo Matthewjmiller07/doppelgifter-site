@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Micrography from Matthew Miller's scriptorium — a picture drawn entirely in tiny Hebrew letters — printed, framed, or fused onto a phone case by DoppelGifter.">
+<link rel="preconnect" href="https://knbyyykfwwlgnizutqyb.supabase.co" crossorigin>
+<title>The Scriptorium — DoppelGifter</title>
+<style>
+  :root {
+    --ground: #F5F1E6;
+    --ground-raise: #FDFBF4;
+    --ink: #1E3329;
+    --ink-soft: #52655B;
+    --line: #D8D0BC;
+    --gilt: #A87F1F;
+    --gilt-bright: #C8A028;
+    --seal: #B03A2E;
+    --shadow: 0 2px 14px rgba(30, 51, 41, 0.10);
+    --serif: "Palatino", "Iowan Old Style", "Book Antiqua", "Palatino Linotype", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #142720;
+      --ground-raise: #1C332A;
+      --ink: #EDE6D3;
+      --ink-soft: #9FB0A4;
+      --line: #2E4A3D;
+      --gilt: #C8A028;
+      --gilt-bright: #DDBA4A;
+      --seal: #C4483B;
+      --shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #142720;
+    --ground-raise: #1C332A;
+    --ink: #EDE6D3;
+    --ink-soft: #9FB0A4;
+    --line: #2E4A3D;
+    --gilt: #C8A028;
+    --gilt-bright: #DDBA4A;
+    --seal: #C4483B;
+    --shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  a { color: var(--gilt); }
+
+  #brandbar {
+    display: flex; justify-content: center; padding: 18px 16px 0;
+  }
+  #brandbar a {
+    font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--ink-soft); font-weight: 600; text-decoration: none;
+  }
+  #brandbar b { color: var(--gilt); }
+
+  main { max-width: 1060px; margin: 0 auto; padding: 32px 16px 64px; }
+
+  .qnum {
+    font-size: 12px; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--gilt); font-weight: 700; margin-bottom: 12px;
+  }
+  h1, h2, h3 {
+    font-family: var(--serif); font-weight: 500; line-height: 1.12; margin: 0 0 14px; text-wrap: balance;
+  }
+  h1 { font-size: clamp(36px, 6vw, 60px); letter-spacing: -0.01em; }
+  h2 { font-size: clamp(24px, 3.6vw, 32px); }
+  .lede { font-size: 17px; color: var(--ink-soft); max-width: 58ch; margin: 0 0 28px; }
+  .lede em { color: var(--ink); }
+  .hint { font-size: 13px; color: var(--ink-soft); margin-top: 12px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    background: var(--seal); color: #fff; border: none; cursor: pointer;
+    font-size: 17px; font-weight: 600; padding: 14px 28px; border-radius: 4px;
+    box-shadow: var(--shadow); font-family: inherit; text-decoration: none;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: 0.6; cursor: progress; filter: none; }
+  .btn:focus-visible, .pick:focus-visible, .chip:focus-visible, input:focus-visible {
+    outline: 3px solid var(--gilt-bright); outline-offset: 2px;
+  }
+
+  .banner {
+    border-left: 4px solid var(--gilt); background: var(--ground-raise);
+    padding: 12px 16px; margin: 0 0 24px; border-radius: 0 4px 4px 0; font-size: 15px;
+  }
+  .banner.err { border-left-color: var(--seal); }
+
+  /* ——— Layout ——— */
+  .shop { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; align-items: start; }
+  @media (min-width: 860px) { .shop { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); } }
+
+  .stage {
+    background: var(--ground-raise); border: 1px solid var(--line); border-radius: 6px;
+    padding: 28px 20px 20px; display: flex; flex-direction: column; align-items: center; gap: 14px;
+    position: sticky; top: 16px;
+  }
+  @media (max-width: 859px) { .stage { position: static; } }
+  .stage canvas { max-width: 100%; height: auto; display: block; }
+  .plaque {
+    font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--ink-soft);
+    text-align: center; max-width: 42ch;
+  }
+
+  .picks { display: grid; gap: 12px; margin: 0 0 22px; }
+  .pick {
+    display: grid; grid-template-columns: 1fr auto; gap: 2px 14px; text-align: left;
+    background: var(--ground-raise); border: 1px solid var(--line); border-radius: 6px;
+    padding: 14px 16px; cursor: pointer; font-family: inherit; color: var(--ink);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .pick:hover { border-color: var(--gilt); }
+  .pick[aria-pressed="true"] { border-color: var(--gilt); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gilt-bright) 30%, transparent); }
+  .pick-name { font-family: var(--serif); font-size: 20px; }
+  .pick-price { font-weight: 700; font-size: 17px; align-self: start; }
+  .pick-desc { grid-column: 1 / -1; font-size: 14px; color: var(--ink-soft); line-height: 1.45; }
+
+  .opts { margin: 0 0 22px; }
+  .opts-label { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    border: 1px solid var(--line); background: var(--ground-raise); color: var(--ink);
+    border-radius: 999px; padding: 7px 14px; font-size: 14px; cursor: pointer; font-family: inherit;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .chip[aria-pressed="true"] { border-color: var(--gilt); background: color-mix(in srgb, var(--gilt-bright) 18%, var(--ground-raise)); font-weight: 600; }
+  .swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); }
+
+  .field { margin: 0 0 16px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; }
+  .field input {
+    width: 100%; max-width: 360px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 4px;
+    background: var(--ground-raise); color: var(--ink); font-family: inherit; font-size: 15px;
+  }
+  #promo { text-transform: uppercase; letter-spacing: 0.05em; max-width: 220px; }
+
+  .total {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    border-top: 1px solid var(--line); padding-top: 14px; margin: 8px 0 18px; font-size: 15px; color: var(--ink-soft);
+  }
+  .total b { font-size: 22px; color: var(--ink); font-family: var(--serif); font-weight: 500; }
+  #payBtn { width: 100%; }
+  #payNote { min-height: 1.4em; }
+
+  /* ——— Empty + thank-you states ——— */
+  .center { text-align: center; max-width: 640px; margin: 8vh auto 0; }
+  .center .lede { margin-left: auto; margin-right: auto; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="brandbar"><a href="/">Doppel<b>Gifter</b> · The Scriptorium</a></div>
+
+<main>
+  <!-- No draft: how to get here -->
+  <section id="emptyState" class="center hidden">
+    <div class="qnum">The Scriptorium</div>
+    <h1>Scripture.<br>On stuff.</h1>
+    <p class="lede">Micrography is the thousand-year-old Jewish art of drawing pictures out of tiny letters. Our resident scribe built a machine that does it for you — any photo, any name, any verse. <em>Make one there, then come back here to make it permanent.</em></p>
+    <a class="btn" href="https://matthewjamesmiller.com/micrography">Open the scriptorium →</a>
+    <p class="hint">Takes a minute · zero calligraphy experience required · your bubbe will ask where you got it</p>
+  </section>
+
+  <!-- Paid -->
+  <section id="thanksState" class="center hidden">
+    <div class="qnum">It is written</div>
+    <h1>Several thousand tiny letters are on their way.</h1>
+    <p class="lede" id="thanksLede">Your payment has cleared. A confirmation is in your inbox, and a tracking link follows when it ships. <em>No backsies — it's practically carved in stone now.</em></p>
+    <img id="thanksImg" alt="" style="max-width:280px; width:100%; border:8px solid #E4C158; outline:4px solid #8A6914; margin:8px auto 24px; display:none;">
+    <div><a class="btn" href="https://matthewjamesmiller.com/micrography">Draw another →</a></div>
+  </section>
+
+  <!-- The shop -->
+  <section id="shopState" class="hidden">
+    <div id="banner"></div>
+    <div class="shop">
+      <div class="stage">
+        <canvas id="mockup" width="560" height="700" aria-label="Preview of your piece on the chosen product"></canvas>
+        <div class="plaque" id="plaque">Your micrography</div>
+      </div>
+
+      <div>
+        <div class="qnum">From the scriptorium of Matthew Miller</div>
+        <h2>You drew a picture out of a thousand tiny letters.</h2>
+        <p class="lede">Very holy. Very patient. Now let's put it somewhere your relatives can't ignore. <em>Every letter is real and readable up close — bring a magnifying glass to the gifting.</em></p>
+
+        <div class="picks" role="group" aria-label="Choose a product">
+          <button class="pick" type="button" data-product="mg_print" aria-pressed="true">
+            <span class="pick-name">The Scribe's Print</span><span class="pick-price">$44</span>
+            <span class="pick-desc">12×16 fine-art paper, 200gsm, museum-grade. Rabbi-approved* <small>(*no rabbi was consulted)</small>.</span>
+          </button>
+          <button class="pick" type="button" data-product="mg_framed" aria-pressed="false">
+            <span class="pick-name">The Illuminated Frame</span><span class="pick-price">$119</span>
+            <span class="pick-desc">Matted, framed, sealed behind glass. For the wall where the diplomas used to hang.</span>
+          </button>
+          <button class="pick" type="button" data-product="mg_case" aria-pressed="false">
+            <span class="pick-name">The Pocket Psalter</span><span class="pick-price">$39</span>
+            <span class="pick-desc">A tough, glossy phone case. You drop your phone daily; now it quotes scripture on impact.</span>
+          </button>
+        </div>
+
+        <div class="opts hidden" id="frameOpts">
+          <div class="opts-label">Frame</div>
+          <div class="chips" role="group" aria-label="Frame color">
+            <button class="chip" type="button" data-variant="black" aria-pressed="true"><span class="swatch" style="background:#1d1b19"></span>Black</button>
+            <button class="chip" type="button" data-variant="natural" aria-pressed="false"><span class="swatch" style="background:#c39a6b"></span>Natural oak</button>
+            <button class="chip" type="button" data-variant="white" aria-pressed="false"><span class="swatch" style="background:#f4f2ee"></span>White</button>
+            <button class="chip" type="button" data-variant="gold" aria-pressed="false"><span class="swatch" style="background:#c8a028"></span>Gold</button>
+          </div>
+        </div>
+
+        <div class="opts hidden" id="caseOpts">
+          <div class="opts-label">Phone</div>
+          <div class="chips" role="group" aria-label="Phone model">
+            <button class="chip" type="button" data-variant="ip17" aria-pressed="false">iPhone 17</button>
+            <button class="chip" type="button" data-variant="ip16" aria-pressed="true">iPhone 16</button>
+            <button class="chip" type="button" data-variant="ip15" aria-pressed="false">iPhone 15</button>
+            <button class="chip" type="button" data-variant="s24" aria-pressed="false">Galaxy S24</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="email">Email for the receipt (and the tracking link)</label>
+          <input id="email" type="email" autocomplete="email" placeholder="you@example.com">
+        </div>
+        <div class="field">
+          <label for="promo">Promo code <span style="font-weight:400">(optional)</span></label>
+          <input id="promo" autocomplete="off" spellcheck="false" placeholder="IKNOWTHEGUY">
+        </div>
+
+        <div class="total"><span id="totalLabel">The Scribe's Print + $4.99 shipping (US)</span><b id="totalPrice">$48.99</b></div>
+        <button class="btn" id="payBtn" type="button">Commission it →</button>
+        <p class="hint" id="payNote">Printed and shipped by our partners at Prodigi · 3–7 business days to print, then the mail does its thing.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var CONFIG = {
+    url: "https://knbyyykfwwlgnizutqyb.supabase.co",
+    anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuYnl5eWtmd3dsZ25penV0cXliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4MjI3MDMsImV4cCI6MjA5NjM5ODcwM30.xbArp2d_jbD28dqg5ZdjgmaqKJ6erbTtVzMv22TDsxg"
+  };
+
+  // Print-file pixel sizes from the Prodigi catalogue (printAreaSizes). The 12×16
+  // print's native 3600×4800 is past iOS's canvas ceiling, so it's sent at 3:4
+  // 2700×3600 and Prodigi scales it up (fillPrintArea).
+  var PRODUCTS = {
+    mg_print:  { name: "The Scribe's Print",     cents: 4400,  w: 2700, h: 3600, margin: 0.06, variants: ["standard"], def: "standard" },
+    mg_framed: { name: "The Illuminated Frame",  cents: 11900, w: 2400, h: 3600, margin: 0.06, variants: ["black", "natural", "white", "gold"], def: "black" },
+    mg_case:   { name: "The Pocket Psalter",     cents: 3900,  w: 1266, h: 2121, margin: 0.09, variants: ["ip17", "ip16", "ip15", "s24"], def: "ip16" }
+  };
+  var FRAME_COLORS = { black: "#1d1b19", natural: "#c39a6b", white: "#f4f2ee", gold: "#c8a028" };
+  var SHIPPING_CENTS = 499;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var params = new URLSearchParams(location.search);
+  var draftId = (params.get("d") || "").toLowerCase();
+  var state = { product: "mg_print", variant: "standard", meta: null, plate: null, plateUrl: null };
+
+  function api(fn, body) {
+    return fetch(CONFIG.url + "/functions/v1/" + fn, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.anon },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+        return d;
+      });
+    });
+  }
+
+  function show(id) {
+    ["emptyState", "thanksState", "shopState"].forEach(function (s) { $(s).classList.toggle("hidden", s !== id); });
+  }
+
+  function money(c) { return "$" + (c / 100).toFixed(2); }
+
+  // ——— Paid: thank-you ———
+  if (params.get("order") === "success" && params.get("oid")) {
+    show("thanksState");
+    api("dg-checkout", { lookup_order_id: params.get("oid") }).then(function (o) {
+      if (o.preview_url) { $("thanksImg").src = o.preview_url; $("thanksImg").style.display = "block"; }
+      if (o.status === "pending") {
+        $("thanksLede").innerHTML = "Stripe is still stamping the paperwork — refresh in a moment. <em>The scribes are patient; they had to be.</em>";
+      }
+    }).catch(function () {});
+    try { if (window.fbq) fbq("track", "Purchase"); if (window.ttq) ttq.track("CompletePayment"); } catch (e) {}
+    return;
+  }
+
+  if (!/^[0-9a-f-]{36}$/.test(draftId)) { show("emptyState"); return; }
+
+  // ——— Composition: the exact pixels sent to the printer ———
+  function composePrint(product, scale) {
+    var p = PRODUCTS[product];
+    var w = Math.round(p.w * scale), h = Math.round(p.h * scale);
+    var c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    var ctx = c.getContext("2d");
+    ctx.fillStyle = (state.meta && state.meta.paper) || "#efe6d2";
+    ctx.fillRect(0, 0, w, h);
+    var img = state.plate;
+    var m = Math.round(Math.min(w, h) * p.margin);
+    var f = Math.min((w - 2 * m) / img.naturalWidth, (h - 2 * m) / img.naturalHeight);
+    var dw = img.naturalWidth * f, dh = img.naturalHeight * f;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    return c;
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // ——— Mockups, drawn from the same composition as the print file ———
+  function drawMockup() {
+    var cv = $("mockup");
+    var ctx = cv.getContext("2d");
+    var W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    if (!state.plate) return;
+    var p = PRODUCTS[state.product];
+    var art = composePrint(state.product, 0.25);
+    ctx.save();
+    if (state.product === "mg_case") {
+      var ch = H * 0.92, cw = ch * p.w / p.h, x = (W - cw) / 2, y = (H - ch) / 2, r = cw * 0.15;
+      ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 10;
+      roundRect(ctx, x, y, cw, ch, r); ctx.fillStyle = "#222"; ctx.fill();
+      ctx.shadowColor = "transparent";
+      roundRect(ctx, x, y, cw, ch, r); ctx.save(); ctx.clip();
+      ctx.drawImage(art, x, y, cw, ch);
+      // gloss
+      var g = ctx.createLinearGradient(x, y, x + cw, y + ch);
+      g.addColorStop(0, "rgba(255,255,255,0.22)"); g.addColorStop(0.45, "rgba(255,255,255,0)");
+      ctx.fillStyle = g; ctx.fillRect(x, y, cw, ch);
+      ctx.restore();
+      // camera bump
+      var bx = x + cw * 0.07, by = y + ch * 0.035, bs = cw * 0.4;
+      roundRect(ctx, bx, by, bs, bs, bs * 0.22); ctx.fillStyle = "rgba(20,20,20,0.85)"; ctx.fill();
+      [[0.3, 0.3], [0.3, 0.72], [0.72, 0.5]].forEach(function (o) {
+        ctx.beginPath(); ctx.arc(bx + bs * o[0], by + bs * o[1], bs * 0.15, 0, Math.PI * 2);
+        ctx.fillStyle = "#0b0b0b"; ctx.fill(); ctx.strokeStyle = "#555"; ctx.lineWidth = 2; ctx.stroke();
+      });
+    } else if (state.product === "mg_framed") {
+      var fh = H * 0.94, fw = fh * 12 / 16, fx = (W - fw) / 2, fy = (H - fh) / 2, bw = fw * 0.055;
+      ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 26; ctx.shadowOffsetY = 12;
+      ctx.fillStyle = FRAME_COLORS[state.variant] || "#1d1b19";
+      ctx.fillRect(fx, fy, fw, fh);
+      ctx.shadowColor = "transparent";
+      ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1; ctx.strokeRect(fx + bw, fy + bw, fw - 2 * bw, fh - 2 * bw);
+      ctx.fillStyle = "#fbfaf6"; ctx.fillRect(fx + bw, fy + bw, fw - 2 * bw, fh - 2 * bw);
+      var ah = (fh - 2 * bw) * 0.78, aw = ah * p.w / p.h;
+      ctx.drawImage(art, (W - aw) / 2, fy + (fh - ah) / 2, aw, ah);
+      var gl = ctx.createLinearGradient(fx, fy, fx + fw, fy + fh);
+      gl.addColorStop(0, "rgba(255,255,255,0.16)"); gl.addColorStop(0.4, "rgba(255,255,255,0)");
+      ctx.fillStyle = gl; ctx.fillRect(fx + bw, fy + bw, fw - 2 * bw, fh - 2 * bw);
+    } else {
+      var ph = H * 0.94, pw = ph * p.w / p.h, px = (W - pw) / 2, py = (H - ph) / 2;
+      ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 20; ctx.shadowOffsetY = 8;
+      ctx.fillStyle = "#fff"; ctx.fillRect(px, py, pw, ph);
+      ctx.shadowColor = "transparent";
+      ctx.drawImage(art, px, py, pw, ph);
+    }
+    ctx.restore();
+  }
+
+  // ——— Picker ———
+  function setProduct(product) {
+    state.product = product;
+    state.variant = PRODUCTS[product].def;
+    document.querySelectorAll(".pick").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.product === product)); });
+    $("frameOpts").classList.toggle("hidden", product !== "mg_framed");
+    $("caseOpts").classList.toggle("hidden", product !== "mg_case");
+    syncChips();
+    render();
+  }
+  function syncChips() {
+    document.querySelectorAll(".chip").forEach(function (c) { c.setAttribute("aria-pressed", String(c.dataset.variant === state.variant)); });
+  }
+  function render() {
+    var p = PRODUCTS[state.product];
+    $("totalLabel").textContent = p.name + " + " + money(SHIPPING_CENTS) + " shipping (US)";
+    $("totalPrice").textContent = money(p.cents + SHIPPING_CENTS);
+    drawMockup();
+  }
+  document.querySelectorAll(".pick").forEach(function (b) {
+    b.addEventListener("click", function () { setProduct(b.dataset.product); });
+  });
+  document.querySelectorAll(".chip").forEach(function (c) {
+    c.addEventListener("click", function () {
+      if (PRODUCTS[state.product].variants.indexOf(c.dataset.variant) === -1) return;
+      state.variant = c.dataset.variant; syncChips(); render();
+    });
+  });
+
+  try { $("email").value = localStorage.dgEmail || ""; } catch (e) {}
+
+  if (params.get("order") === "cancelled") {
+    $("banner").innerHTML = '<div class="banner">Checkout abandoned. <em>Cold feet? The letters understand. They have waited three thousand years; they can wait another minute.</em></div>';
+  }
+
+  // ——— Load the draft ———
+  show("shopState");
+  api("dg-mg-draft", { action: "get", id: draftId }).then(function (d) {
+    state.meta = d.meta;
+    state.plateUrl = d.plate_url;
+    var title = d.meta.text_ref || d.meta.title;
+    $("plaque").textContent = (title ? "“" + title + "”, " : "") + (d.meta.ink_name || "ink").toLowerCase() + " on several thousand very small letters";
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { reject(new Error("The artwork didn't load — try drawing it again.")); };
+      img.src = d.plate_url;
+    });
+  }).then(function (img) {
+    state.plate = img;
+    render();
+  }).catch(function (e) {
+    $("banner").innerHTML = '<div class="banner err">We couldn\'t find that drawing. ' + (e.message || "") + ' <a href="https://matthewjamesmiller.com/micrography">Back to the scriptorium →</a></div>';
+    $("payBtn").disabled = true;
+  });
+
+  // ——— Checkout ———
+  function uploadTo(signedUrl, blob) {
+    var fd = new FormData();
+    fd.append("cacheControl", "3600");
+    fd.append("", blob, "print.jpg");
+    return fetch(signedUrl, { method: "PUT", headers: { "x-upsert": "false" }, body: fd }).then(function (r) {
+      if (!r.ok) throw new Error("upload failed (" + r.status + ")");
+    });
+  }
+
+  $("payBtn").addEventListener("click", function () {
+    if (!state.plate) return;
+    var btn = $("payBtn"), note = $("payNote");
+    var email = $("email").value.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      $("email").style.borderColor = "var(--seal)"; $("email").focus(); return;
+    }
+    try { if (email) localStorage.dgEmail = email; } catch (e) {}
+    btn.disabled = true;
+    btn.textContent = "The scribes are inking the print file…";
+    note.textContent = "";
+
+    var print;
+    try { print = composePrint(state.product, 1); } catch (e) { print = null; }
+    var blobP = new Promise(function (resolve) {
+      if (!print) return resolve(null);
+      try { print.toBlob(function (b) { resolve(b); }, "image/jpeg", 0.92); } catch (e) { resolve(null); }
+    });
+
+    blobP.then(function (blob) {
+      // A tainted or failed canvas falls back to the plate itself; Prodigi fits it to the print area.
+      if (!blob) return state.plateUrl;
+      return api("dg-mg-draft", { action: "print", id: draftId, product: state.product }).then(function (s) {
+        return uploadTo(s.upload_url, blob).then(function () { return s.print_url; });
+      });
+    }).then(function (printUrl) {
+      btn.textContent = "Opening the treasury…";
+      var sk = null; try { sk = localStorage.dgSession; } catch (e) {}
+      var promo = $("promo").value.trim();
+      var title = (state.meta && (state.meta.text_ref || state.meta.title)) || "Micrography";
+      return api("dg-checkout", {
+        product: state.product,
+        variant: state.variant,
+        draft_id: draftId,
+        art_url: printUrl,
+        preview_url: state.plateUrl,
+        style: "Scripture — " + title,
+        art_style: "micrography",
+        email: email || undefined,
+        session_key: sk || undefined,
+        promo: promo || undefined
+      });
+    }).then(function (d) {
+      try { if (window.ttq) ttq.track("InitiateCheckout"); } catch (e) {}
+      location.href = d.url;
+    }).catch(function (e) {
+      btn.disabled = false;
+      btn.textContent = "Commission it — try again";
+      note.textContent = "The treasury hiccuped: " + e.message;
+    });
+  });
+})();
+</script>
+</body>
+</html>
