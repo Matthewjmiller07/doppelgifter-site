@@ -202,17 +202,13 @@
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--gilt-bright) 22%, transparent);
   }
   .choice img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+  #giftOpts { margin-top: 18px; }
+  #giftOpts .chip[aria-pressed="true"] { border-color: var(--gilt); background: color-mix(in srgb, var(--gilt-bright) 20%, var(--ground-raise)); font-weight: 650; }
   .newtag {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 10px; font-weight: 700;
     letter-spacing: 0.12em; text-transform: uppercase; color: #fff; background: var(--seal);
     padding: 2px 6px; border-radius: 3px; vertical-align: middle; margin-left: 4px;
   }
-  #scribeExtras {
-    display: none; margin-top: 22px; padding: 16px 18px; border: 1px solid var(--gilt);
-    border-radius: 6px; background: var(--ground-raise); max-width: 640px;
-  }
-  #scribeExtras b { font-family: "Palatino", "Iowan Old Style", "Book Antiqua", Georgia, serif; font-weight: 500; font-size: 18px; }
-  #scribeExtras p { margin: 6px 0 12px; color: var(--ink-soft); font-size: 15px; }
   .choice .cname { font-weight: 650; font-size: 16px; }
   .choice .cname .serif { font-size: 17px; }
   .choice .cdesc { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
@@ -454,12 +450,27 @@
         <span class="cname">The Parlour Deck · Custom Charades <span class="price"><s style="opacity:.55;font-weight:500;margin-right:4px;">$54.99</s>$39.99</span></span>
         <span class="cdesc">A charades game where every card stars their face. 54 scenes of them, linen finish, gilt tuck box.</span>
       </button>
+      <button class="choice" data-gift="The Gallery Frame" data-price="119">
+        <span class="giftglyph">🖼️</span>
+        <span class="cname">The Gallery Frame <span class="newtag">New</span> <span class="price">$119</span></span>
+        <span class="cdesc">12×16, matted, fine-art paper behind glass. For the wall where the diplomas used to hang.</span>
+      </button>
+      <button class="choice" data-gift="The Collector's Print" data-price="44">
+        <span class="giftglyph">📜</span>
+        <span class="cname">The Collector's Print <span class="newtag">New</span> <span class="price">$44</span></span>
+        <span class="cdesc">12×16 fine-art paper, museum matte. Frame-ready, or gloriously unframed.</span>
+      </button>
+      <button class="choice" data-gift="The Pocket Shrine" data-price="39">
+        <span class="giftglyph">📱</span>
+        <span class="cname">The Pocket Shrine <span class="newtag">New</span> <span class="price">$39</span></span>
+        <span class="cdesc">A tough, glossy phone case. Every pocket-dial is now a personal appearance.</span>
+      </button>
     </div>
-    <div id="scribeExtras">
-      <b>📜 Scribe-only commissions</b>
-      <p>A portrait made of words deserves better than a mug (though the mug is excellent). Matted and framed behind glass, a fine-art print, or a phone case that quotes them every time you drop it.</p>
-      <a class="btn ghost" id="scribeExtrasLink" href="scripture.html" style="text-decoration:none">Frame it, print it, or case it →</a>
+    <div id="giftOpts" hidden>
+      <div class="okline" id="giftOptsLabel" style="margin-bottom:8px;"><b>Frame</b></div>
+      <div id="giftOptsChips" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
     </div>
+
     <div id="livePrev4" style="display:none; margin-top:24px; max-width:230px; position:relative;">
       <img class="framed" id="prev4Img" alt="Live product mockup" style="aspect-ratio:1/1; object-fit:cover;">
       <div class="veil" id="veilPrev4"><div class="ring"></div><div class="veilText">Pressing…</div></div>
@@ -728,18 +739,28 @@
       veil("veilPrev3", e.code === 402 ? "📧 Email needed — continue →" : "😔 " + e.message);
     });
   });
-  function syncScribeExtras() {
-    document.getElementById("scribeExtras").style.display = STYLE_KEYS[state.style] === "micrography" ? "block" : "none";
+  function renderGiftOpts() {
+    var key = GIFT_KEYS[state.gift], o = GIFT_OPTIONS[key];
+    var box = document.getElementById("giftOpts");
+    box.hidden = !(o && o.list.length);
+    if (box.hidden) return;
+    document.getElementById("giftOptsLabel").innerHTML = "<b>" + o.label + "</b>";
+    var chips = document.getElementById("giftOptsChips");
+    chips.innerHTML = "";
+    o.list.forEach(function (it) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.style.cursor = "pointer";
+      b.textContent = it[1];
+      b.setAttribute("aria-pressed", String(giftVariant[key] === it[0]));
+      b.addEventListener("click", function () {
+        giftVariant[key] = it[0];
+        renderGiftOpts();
+        var sel = document.querySelector("#giftGrid .choice.selected");
+        if (sel) sel.click();            // re-run the live preview for this option
+      });
+      chips.appendChild(b);
+    });
   }
-  document.querySelectorAll("#styleGrid .choice").forEach(function (c) { c.addEventListener("click", syncScribeExtras); });
-  document.getElementById("scribeExtrasLink").addEventListener("click", function (e) {
-    if (scribeDraft) return;                       // already has ?d=
-    e.preventDefault();
-    var a = this;
-    a.textContent = "Inscribing first…";
-    ensureArt().then(function () { location.href = a.href; })
-      .catch(function () { a.textContent = "Upload their photo first →"; });
-  });
   wireGrid("giftGrid", "giftNext", function (c) {
     state.gift = c.dataset.gift;
     state.price = parseFloat(c.dataset.price);
@@ -747,6 +768,7 @@
     if (state.gift === "The Parlour Deck") renderPitchCards();
     var box = document.getElementById("livePrev4");
     var giftKey = GIFT_KEYS[state.gift];
+    renderGiftOpts();
     box.style.display = "block";
     if (!state.photo) {
       document.getElementById("prev4Img").src = DEMO_MOCKS[giftKey];
@@ -755,8 +777,8 @@
       return;
     }
     box.querySelector(".plaque").textContent = "On the goods — live";
-    if (mockCache[giftKey]) {
-      document.getElementById("prev4Img").src = mockCache[giftKey];
+    if (mockCache[mockKey(giftKey)]) {
+      document.getElementById("prev4Img").src = mockCache[mockKey(giftKey)];
       veil("veilPrev4", false);
       return;
     }
@@ -779,7 +801,7 @@
     var ship = 4.99;
     var dig = document.getElementById("digitalUp").checked ? 9.99 : 0;
     var rev = Math.max(0.5, state.price + ship + dig - (state.promoOff || 0));
-    var cogsRate = { "The Ceremonial Mug": 10.13, "The Monument Tee": 13.40, "The Heirloom Blanket": 22.05, "The Gallery Poster": 12.80, "The Parlour Deck": 13.69 };
+    var cogsRate = { "The Ceremonial Mug": 10.13, "The Monument Tee": 13.40, "The Heirloom Blanket": 22.05, "The Gallery Poster": 12.80, "The Parlour Deck": 13.69, "The Gallery Frame": 74.80, "The Collector's Print": 20.09, "The Pocket Shrine": 15.61 };
     var cogs = cogsRate[state.gift] || 11;
     var stripe = rev * 0.029 + 0.30;
     var profit = rev - cogs - 0.04 - stripe;
@@ -821,10 +843,21 @@
   var urlPromo = null;
   try { urlPromo = new URLSearchParams(location.search).get("code"); } catch (e) {}
   var STYLE_KEYS = { "The Renaissance Noble": "renaissance", "The Saturday Cartoon": "cartoon", "The '85 Glamour Shot": "glamour", "The Marble Bust": "marble", "The Scribe": "micrography" };
-  var GIFT_KEYS = { "The Ceremonial Mug": "mug", "The Monument Tee": "tee", "The Heirloom Blanket": "blanket", "The Gallery Poster": "poster", "The Parlour Deck": "cards" };
+  var GIFT_KEYS = { "The Ceremonial Mug": "mug", "The Monument Tee": "tee", "The Heirloom Blanket": "blanket", "The Gallery Poster": "poster", "The Parlour Deck": "cards", "The Gallery Frame": "mg_framed", "The Collector's Print": "mg_print", "The Pocket Shrine": "mg_case" };
+  // Options for the new wall art / case (frame color, phone model) — values match dg-checkout
+  var GIFT_OPTIONS = {
+    mg_framed: { label: "Frame", def: "black", list: [["black", "Black"], ["natural", "Natural oak"], ["white", "White"], ["gold", "Gold"]] },
+    mg_case: { label: "Phone", def: "ip16", list: [["ip17", "iPhone 17"], ["ip16", "iPhone 16"], ["ip15", "iPhone 15"], ["s24", "Galaxy S24"]] },
+    mg_print: { label: null, def: "standard", list: [] }
+  };
+  var giftVariant = { mg_framed: "black", mg_case: "ip16", mg_print: "standard" };
+  function mockKey(k) { return GIFT_OPTIONS[k] ? k + ":" + giftVariant[k] : k; }
   var artPromise = null, artStyle = null, mockCache = {}, mockPromises = {}, lastArt = null;
-  var DEMO_MOCKS = { mug: "demo/mug.jpg", tee: "demo/tee.jpg", poster: "demo/poster.jpg", blanket: "demo/blanket.jpg", cards: "demo/cards.jpg" };
-  var GIFT_NAMES = { mug: "The Ceremonial Mug", tee: "The Monument Tee", blanket: "The Heirloom Blanket", poster: "The Gallery Poster", cards: "The Parlour Deck" };
+  var DEMO_MOCKS = { mug: "demo/mug.jpg", tee: "demo/tee.jpg", poster: "demo/poster.jpg", blanket: "demo/blanket.jpg", cards: "demo/cards.jpg",
+    mg_framed: "https://knbyyykfwwlgnizutqyb.supabase.co/storage/v1/object/public/dg-art/claude-preview-test/203f77f6-6dbc-43f2-afe6-735faec1d1fe.jpg",
+    mg_print: "https://knbyyykfwwlgnizutqyb.supabase.co/storage/v1/object/public/dg-art/claude-preview-test/2a6a51a4-1b9f-452f-8858-cd8593338aeb.jpg",
+    mg_case: "https://knbyyykfwwlgnizutqyb.supabase.co/storage/v1/object/public/dg-art/claude-preview-test/86358e53-7afb-4ce5-bc8e-d8167d28e8da.jpg" };
+  var GIFT_NAMES = { mug: "The Ceremonial Mug", tee: "The Monument Tee", blanket: "The Heirloom Blanket", poster: "The Gallery Poster", cards: "The Parlour Deck", mg_framed: "The Gallery Frame", mg_print: "The Collector's Print", mg_case: "The Pocket Shrine" };
   var DEMO_ART = "demo/renaissance-art.png";
   function absUrl(p) { return new URL(p, location.href).href; }
 
@@ -940,13 +973,13 @@
       document.getElementById("summaryImg").src = lastArt;
       veil("veilArt", false);
     }
-    if (mockCache[giftKey]) {
+    if (mockCache[mockKey(giftKey)]) {
       if (document.getElementById("livePrev4").style.display !== "none") {
-        document.getElementById("prev4Img").src = mockCache[giftKey];
+        document.getElementById("prev4Img").src = mockCache[mockKey(giftKey)];
         veil("veilPrev4", false);
       }
       if (cur === 5) {
-        showMock(mockCache[giftKey]);
+        showMock(mockCache[mockKey(giftKey)]);
         veil("veilMock", false);
       }
     }
@@ -1038,7 +1071,6 @@
 
   /* The Scribe: micrography drawn in the browser (js/micrography.js), then uploaded as a
      draft so mockups, checkout, and the Prodigi storefront all see one https URL. */
-  var scribeDraft = null;
   function scribeText() {
     var about = (document.getElementById("aboutText").value || "").replace(/\s+/g, " ").trim();
     var name = (about.match(/[A-Z][a-z]+/) || [""])[0];
@@ -1073,8 +1105,6 @@
           fd.append("", blob, "plate.jpg");
           return fetch(d.upload_url, { method: "PUT", headers: { "x-upsert": "false" }, body: fd }).then(function (up) {
             if (!up.ok) throw new Error("upload failed (" + up.status + ")");
-            scribeDraft = d.id;
-            document.getElementById("scribeExtrasLink").href = "scripture.html?d=" + d.id;
             return d.plate_url;
           });
         });
@@ -1084,21 +1114,24 @@
 
   function ensureMock(giftKey) {
     return ensureArt().then(function (art) {
-      if (mockCache[giftKey]) return mockCache[giftKey];
-      if (!mockPromises[giftKey]) {
+      if (mockCache[mockKey(giftKey)]) return mockCache[mockKey(giftKey)];
+      var mk = mockKey(giftKey);
+      if (!mockPromises[mk]) {
         atelierStart("🏺 Pressing onto the goods", 10);
-        mockPromises[giftKey] = dgRender({ art_url: art, products: [giftKey] }).then(function (d) {
-          mockCache[giftKey] = d.mockups[giftKey];
+        var variants = {};
+        if (GIFT_OPTIONS[giftKey]) variants[giftKey] = giftVariant[giftKey];
+        mockPromises[mk] = dgRender({ art_url: art, products: [giftKey], variants: variants }).then(function (d) {
+          mockCache[mk] = d.mockups[giftKey];
           atelierDone("✓ Preview ready");
           refreshPanels();
-          return mockCache[giftKey];
+          return mockCache[mk];
         }).catch(function (e) {
-          delete mockPromises[giftKey];
+          delete mockPromises[mk];
           atelierDone("😔 The atelier hiccuped");
           throw e;
         });
       }
-      return mockPromises[giftKey];
+      return mockPromises[mk];
     });
   }
 
@@ -1129,8 +1162,8 @@
     ensureArt().then(function (art) {
       veil("veilArt", false);
       document.getElementById("summaryImg").src = art;
-      if (mockCache[giftKey]) {
-        showMock(mockCache[giftKey]);
+      if (mockCache[mockKey(giftKey)]) {
+        showMock(mockCache[mockKey(giftKey)]);
         veil("veilMock", false);
         status.textContent = "✓ Rendered live from your photo.";
         return;
@@ -1234,11 +1267,11 @@
     btn.textContent = "Waiting for the atelier to finish…";
     ensureArt().then(function (art) {
       btn.textContent = "Opening the treasury…";
-      var mock = mockCache[GIFT_KEYS[state.gift]] || null;
+      var mock = mockCache[mockKey(GIFT_KEYS[state.gift])] || null;
       try {
         localStorage.dgLastOrder = JSON.stringify({ img: mock || art, gift: state.gift, style: state.style });
       } catch (err) {}
-      var checkoutBody = { style: state.style, art_style: STYLE_KEYS[state.style], product: GIFT_KEYS[state.gift], art_url: art, preview_url: mock, email: dgEmail(), session_key: SKEY, utm: dgUtm(), digital: document.getElementById("digitalUp").checked, promo: state.promoCode || undefined };
+      var checkoutBody = { style: state.style, art_style: STYLE_KEYS[state.style], product: GIFT_KEYS[state.gift], variant: giftVariant[GIFT_KEYS[state.gift]], art_url: art, preview_url: mock, email: dgEmail(), session_key: SKEY, utm: dgUtm(), digital: document.getElementById("digitalUp").checked, promo: state.promoCode || undefined };
       // The Parlour Deck renders all 48 scenes after purchase (see dg-webhook) — it
       // needs their actual face photo, not just the one style preview.
       if (GIFT_KEYS[state.gift] === "cards") checkoutBody.photo = state.photo;

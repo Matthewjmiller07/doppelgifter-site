@@ -7,10 +7,17 @@ const PRICES: Record<string, { cents: number; name: string }> = {
   poster: { cents: 4499, name: "The Gallery Poster" },
   deck: { cents: 3999, name: "The Parlour Deck (54 cards)" },
   cards: { cents: 3999, name: "The Parlour Deck (54 cards)" }, // homepage alias for deck
-  // Micrography (scripture.html) — fulfilled by Prodigi via dg-prodigi-order
-  mg_print: { cents: 4400, name: "The Scribe's Print (12×16 fine art)" },
-  mg_framed: { cents: 11900, name: "The Illuminated Frame (12×16, matted)" },
-  mg_case: { cents: 3900, name: "The Pocket Psalter (tough phone case)" },
+  // Wall art + cases, offered in both flows. mg_framed is fulfilled by Prodigi
+  // (dg-prodigi-order); mg_print and mg_case by Printify (dg-webhook).
+  mg_print: { cents: 4400, name: "The Collector's Print (12×16 fine art)" },
+  mg_framed: { cents: 11900, name: "The Gallery Frame (12×16, matted)" },
+  mg_case: { cents: 3900, name: "The Pocket Shrine (tough phone case)" },
+};
+// Names used when the art is micrography (scripture.html / The Scribe style)
+const SCRIPTURE_NAMES: Record<string, string> = {
+  mg_print: "The Scribe's Print (12×16 fine art)",
+  mg_framed: "The Illuminated Frame (12×16, matted)",
+  mg_case: "The Pocket Psalter (tough phone case)",
 };
 // Allowed variants per micrography product; must match MG_PRODUCTS in dg-prodigi-order.
 const MG_VARIANTS: Record<string, string[]> = {
@@ -153,11 +160,10 @@ Deno.serve(async (req: Request) => {
   const variant = isMg && MG_VARIANTS[product].includes(body.variant) ? String(body.variant) : null;
   const draftId = typeof body.draft_id === "string" && UUID.test(body.draft_id) ? body.draft_id : null;
   if (isMg) {
-    // The print file must be one dg-mg-draft signed for, not an arbitrary URL.
-    const mgPrefix = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/dg-art/mg/`;
+    // The print file must be art we stored (dg-render / dg-mg-draft), not an arbitrary URL.
+    const artPrefix = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/dg-art/`;
     if (!variant) return json({ error: "Pick a size / model first" }, 400);
-    if (!art_url.startsWith(mgPrefix) || !draftId) return json({ error: "Invalid artwork" }, 400);
-    if (digital) return json({ error: "Digital add-on isn't available for scripture pieces" }, 400);
+    if (!art_url.startsWith(artPrefix)) return json({ error: "Invalid artwork" }, 400);
   }
   if (DECK_PRODUCTS.has(product) && typeof photo === "string" && photo.length > MAX_PHOTO_B64) {
     return json({ error: "Photo too large - resize to 1024px first" }, 400);
@@ -209,7 +215,10 @@ Deno.serve(async (req: Request) => {
   const p = new URLSearchParams();
   p.set("mode", "payment");
   p.set("client_reference_id", order.id);
-  const returnPage = isMg ? `/scripture.html?d=${draftId}&` : "/?";
+  const returnPage = isMg && draftId ? `/scripture.html?d=${draftId}&` : "/?";
+  const productName = (artStyle === "micrography" || String(style ?? "").startsWith("Scripture")) && SCRIPTURE_NAMES[product]
+    ? SCRIPTURE_NAMES[product]
+    : PRICES[product].name;
   p.set(
     "success_url",
     SITE + returnPage + "order=success&sid={CHECKOUT_SESSION_ID}&oid=" + encodeURIComponent(order.id),
@@ -220,7 +229,7 @@ Deno.serve(async (req: Request) => {
   p.set("line_items[0][price_data][unit_amount]", String(PRICES[product].cents));
   p.set(
     "line_items[0][price_data][product_data][name]",
-    PRICES[product].name + " — " + String(style ?? "Custom"),
+    productName + " — " + String(style ?? "Custom"),
   );
   p.set("line_items[0][price_data][product_data][images][0]", displayImage);
   if (digital) {

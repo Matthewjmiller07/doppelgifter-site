@@ -15,6 +15,11 @@ const PRODUCT_NAMES: Record<string, string> = {
   poster: "The Gallery Poster",
   deck: "The Parlour Deck (54 cards)",
   cards: "The Parlour Deck (54 cards)", // homepage alias for deck
+  mg_print: "The Collector's Print",
+  mg_framed: "The Gallery Frame",
+  mg_case: "The Pocket Shrine",
+};
+const SCRIPTURE_NAMES: Record<string, string> = {
   mg_print: "The Scribe's Print",
   mg_framed: "The Illuminated Frame",
   mg_case: "The Pocket Psalter",
@@ -26,10 +31,122 @@ const PRODUCT_QUIPS: Record<string, string> = {
   poster: "their portrait is being pressed onto museum-grade matte paper, frame-ready",
   deck: "the atelier is now painting all 48 scenes of them, one at a time — a second email lands when the gallery is ready",
   cards: "the atelier is now painting all 48 scenes of them, one at a time — a second email lands when the gallery is ready",
-  mg_print: "several thousand very small letters are being pressed onto 200gsm fine-art paper, each one exactly where the scribe left it",
-  mg_framed: "several thousand very small letters are being printed, matted, and sealed behind glass like the relic they are",
-  mg_case: "a verse is being fused onto a tough case, so the phone you drop daily now quotes scripture on impact",
+  mg_print: "their likeness is being pressed onto 12×16 inches of fine-art paper, ready for a frame and a smug little plaque",
+  mg_framed: "their likeness is being printed, matted, and sealed behind glass like the national treasure they believe they are",
+  mg_case: "their face is being fused onto a tough phone case, so every pocket-dial is now a personal appearance",
 };
+const SCRIPTURE_QUIPS: Record<string, string> = {
+  mg_print: "several thousand very small letters are being pressed onto fine-art paper, each one exactly where the scribe left it",
+  mg_framed: "several thousand very small letters are being printed, matted, and sealed behind glass like the relic they are",
+  mg_case: "a portrait made of words is being fused onto a tough case, so the phone you drop daily now quotes them on impact",
+};
+const isScripture = (s: any) =>
+  s.metadata?.art_style === "micrography" || String(s.metadata?.style ?? "").startsWith("Scripture");
+
+// Printify-fulfilled wall art / cases. variant -> Printify variant id; scale is for
+// square art (cover-cropped like Prodigi's fillPrintArea); art composed to the
+// product's own shape on scripture.html (…/print-mg_*) is placed at 1.0.
+const PRINTIFY_GOODS: Record<string, { blueprint: number; provider: number; scale: number; variants: Record<string, number> }> = {
+  mg_print: { blueprint: 804, provider: 72, scale: 1.34, variants: { standard: 75290 } },
+  mg_case: {
+    blueprint: 269, provider: 99, scale: 1.68,
+    variants: { ip15: 103561, ip16: 112814, ip17: 130115, s24: 105527 },
+  },
+};
+
+async function alertOwner(supabase: any, subject: string, detail: string) {
+  try {
+    const { data: brevoKey } = await supabase.rpc("dg_get_secret", { secret_name: "BREVO_API_KEY" });
+    if (!brevoKey) return;
+    await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "api-key": brevoKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sender: { name: "DoppelGifter Alerts", email: "matthew@doppelgifter.com" },
+        to: [{ email: "matthew@doppelgifter.com" }],
+        subject,
+        textContent: detail,
+      }),
+    });
+  } catch (_) { /* best-effort */ }
+}
+
+// Upload art -> create product -> order -> send to production (same pattern as the mug).
+async function startPrintifyGoods(supabase: any, orderId: string, s: any) {
+  const product = s.metadata?.product;
+  const cfg = PRINTIFY_GOODS[product];
+  const variantId = cfg?.variants[s.metadata?.variant ?? ""];
+  try {
+    if (!cfg || !variantId) throw new Error(`no Printify mapping for ${product}/${s.metadata?.variant}`);
+    const artUrl = s.metadata?.art_url;
+    const scale = /\/print-mg_/.test(artUrl ?? "") ? 1.0 : cfg.scale;
+    const { data: pkey } = await supabase.rpc("dg_get_secret", { secret_name: "PRINTIFY_API_KEY" });
+    const H = {
+      Authorization: `Bearer ${pkey}`,
+      "Content-Type": "application/json",
+      "User-Agent": "DoppelGifter/0.1 (+https://doppelgifter.com)",
+    };
+    const up = await (await fetch("https://api.printify.com/v1/uploads/images.json", {
+      method: "POST", headers: H,
+      body: JSON.stringify({ file_name: `order-${orderId}.jpg`, url: artUrl }),
+    })).json();
+    if (!up?.id) throw new Error("printify upload failed: " + JSON.stringify(up).slice(0, 200));
+    const prod = await (await fetch(`https://api.printify.com/v1/shops/${PRINTIFY.shop}/products.json`, {
+      method: "POST", headers: H,
+      body: JSON.stringify({
+        title: `DoppelGifter order ${orderId.slice(0, 8)} — ${PRODUCT_NAMES[product]}`,
+        description: "Custom DoppelGifter order",
+        blueprint_id: cfg.blueprint,
+        print_provider_id: cfg.provider,
+        variants: [{ id: variantId, price: 3900, is_enabled: true }],
+        print_areas: [{
+          variant_ids: [variantId],
+          placeholders: [{ position: "front", images: [{ id: up.id, x: 0.5, y: 0.5, scale, angle: 0 }] }],
+        }],
+      }),
+    })).json();
+    if (!prod?.id) throw new Error("printify product failed: " + JSON.stringify(prod).slice(0, 200));
+
+    const shipping = s.collected_information?.shipping_details ?? s.shipping_details ?? null;
+    const addr = shipping?.address ?? s.customer_details?.address ?? {};
+    const nameParts = String(shipping?.name ?? s.customer_details?.name ?? "DoppelGifter Customer").split(" ");
+    const order = await (await fetch(`https://api.printify.com/v1/shops/${PRINTIFY.shop}/orders.json`, {
+      method: "POST", headers: H,
+      body: JSON.stringify({
+        external_id: orderId,
+        label: `dg-${orderId.slice(0, 8)}`,
+        line_items: [{ product_id: prod.id, variant_id: variantId, quantity: 1 }],
+        shipping_method: 1,
+        send_shipping_notification: true,
+        address_to: {
+          first_name: nameParts[0],
+          last_name: nameParts.slice(1).join(" ") || "-",
+          email: s.customer_details?.email ?? "",
+          phone: s.customer_details?.phone ?? "",
+          country: addr.country ?? "US",
+          region: addr.state ?? "",
+          address1: addr.line1 ?? "",
+          address2: addr.line2 ?? "",
+          city: addr.city ?? "",
+          zip: addr.postal_code ?? "",
+        },
+      }),
+    })).json();
+    if (!order?.id) throw new Error("printify order failed: " + JSON.stringify(order).slice(0, 200));
+    await fetch(`https://api.printify.com/v1/shops/${PRINTIFY.shop}/orders/${order.id}/send_to_production.json`, {
+      method: "POST", headers: H,
+    });
+    await supabase.from("dg_orders").update({
+      status: "submitted", printify_product_id: String(prod.id), printify_order_id: String(order.id),
+    }).eq("id", orderId);
+  } catch (e) {
+    const msg = String((e as Error)?.message ?? e);
+    console.error("printify goods failed", orderId, msg);
+    await supabase.from("dg_orders").update({ status: "failed" }).eq("id", orderId);
+    await alertOwner(supabase, `⚠️ Printify order failed — ${orderId.slice(0, 8)}`,
+      `A paid ${product} order could not be placed with Printify.\n\nOrder: ${orderId}\n\n${msg}`);
+  }
+}
 const MG_PRODUCTS = new Set(["mg_print", "mg_framed", "mg_case"]);
 
 // Hands a paid micrography order to dg-prodigi-order (Prodigi fulfillment). Separate
@@ -100,8 +217,9 @@ async function sendConfirmationEmail(supabase: any, s: any, orderId: string) {
     });
     if (!brevoKey) return;
     const product = s.metadata?.product ?? "mug";
-    const productName = PRODUCT_NAMES[product] ?? "a fine commemorative good";
-    const quip = PRODUCT_QUIPS[product] ?? "their face is being applied to merchandise with great ceremony";
+    const scripture = isScripture(s);
+    const productName = (scripture && SCRIPTURE_NAMES[product]) || PRODUCT_NAMES[product] || "a fine commemorative good";
+    const quip = (scripture && SCRIPTURE_QUIPS[product]) || PRODUCT_QUIPS[product] || "their face is being applied to merchandise with great ceremony";
     const style = s.metadata?.style || "a masterpiece style";
     const img = s.metadata?.preview_url || s.metadata?.art_url || "";
     const digital = s.metadata?.digital === "1";
@@ -129,7 +247,7 @@ async function sendConfirmationEmail(supabase: any, s: any, orderId: string) {
         sender: { name: "The Atelier at DoppelGifter", email: "matthew@doppelgifter.com" },
         replyTo: { name: "Matthew at DoppelGifter", email: "hello@doppelgifter.com" },
         to: [{ email: to }],
-        subject: MG_PRODUCTS.has(product)
+        subject: scripture
           ? `It is done. ${productName} is being inscribed. 📜`
           : `It is done. ${productName} bearing their face is being forged. 🏺`,
         htmlContent: html,
@@ -431,11 +549,14 @@ Deno.serve(async (req: Request) => {
     await sendConfirmationEmail(supabase, s, orderId);
 
     if (MG_PRODUCTS.has(s.metadata?.product)) {
-      const bg = startProdigiOrder(supabase, orderId, s);
+      // Hybrid: the matted frame is Prodigi's; prints and cases are Printify's.
+      const bg = PRINTIFY_GOODS[s.metadata?.product]
+        ? startPrintifyGoods(supabase, orderId, s)
+        : startProdigiOrder(supabase, orderId, s);
       const rt = (globalThis as any).EdgeRuntime;
       if (rt?.waitUntil) rt.waitUntil(bg);
       else await bg;
-      return new Response("paid; sent to Prodigi", { status: 200 });
+      return new Response("paid; sent to fulfillment", { status: 200 });
     }
 
     if (DECK_PRODUCTS.has(s.metadata?.product)) {
