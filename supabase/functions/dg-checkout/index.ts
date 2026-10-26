@@ -12,6 +12,66 @@ const PRICES: Record<string, { cents: number; name: string }> = {
   mg_print: { cents: 4400, name: "The Collector's Print (12×16 fine art)" },
   mg_framed: { cents: 11900, name: "The Gallery Frame (12×16, matted)" },
   mg_case: { cents: 3900, name: "The Pocket Shrine (tough phone case)" },
+  // Parsha Ties (doppelgifter.com/parsha-ties/): $33.32, or $29.99 with code YUD, free US shipping.
+  tie: { cents: 3332, name: "Parsha Tie" },
+};
+// slug -> [parsha name, Printify product id, Stripe product id]. The 54 Printify products are
+// pre-made, so dg-webhook orders them as-is; the Stripe products let the YUD coupon apply to ties only.
+const TIES: Record<string, [string, string, string]> = {
+  "bereishit": ["Bereishit", "6adf53adc60cddcb0600f178", "prod_VVpslhrEay4Vin"],
+  "noach": ["Noach", "6adf53b07f77422b2b0b090f", "prod_VVpsgW5r4MWeRW"],
+  "lech-lecha": ["Lech Lecha", "6adf53b4e1f425fa1d0937e7", "prod_VVps0MhlBJKOz6"],
+  "vayera": ["Vayera", "6adf53b77f77422b2b0b0917", "prod_VVpsobYkm7JSVY"],
+  "chayei-sarah": ["Chayei Sarah", "6adf53bb9d15ca1a990f5639", "prod_VVpsjWTjflqazT"],
+  "toldot": ["Toldot", "6adf53bf10aa455cb00a0123", "prod_VVpsnMqCAfKnaP"],
+  "vayetzei": ["Vayetzei", "6adf53c310aa455cb00a0127", "prod_VVpsIS2im2OVKr"],
+  "vayishlach": ["Vayishlach", "6adf53c674bd2435cf0d84b2", "prod_VVpsqCqKYd34rS"],
+  "vayeshev": ["Vayeshev", "6adf53c97f77422b2b0b0922", "prod_VVpsK7OZ2rJGBP"],
+  "miketz": ["Miketz", "6adf53cd9d15ca1a990f5643", "prod_VVpsAXcswpE1D3"],
+  "vayigash": ["Vayigash", "6adf53d1e1f425fa1d0937f5", "prod_VVpsIyq5G4X1HJ"],
+  "vayechi": ["Vayechi", "6adf53d4e1f425fa1d0937f8", "prod_VVps66Pe7ivMcm"],
+  "shemot": ["Shemot", "6adf53d7250930614e0f25f0", "prod_VVpspnsQz9dyyk"],
+  "vaera": ["Vaera", "6adf53dc74bd2435cf0d84cf", "prod_VVpsN994T4aT8e"],
+  "bo": ["Bo", "6adf53e09d15ca1a990f566c", "prod_VVpsVaEBvaT0IF"],
+  "beshalach": ["Beshalach", "6adf53e49d15ca1a990f5673", "prod_VVpsdP62df5QoZ"],
+  "yitro": ["Yitro", "6adf53e774bd2435cf0d84e4", "prod_VVpsDqDRxD8qcI"],
+  "mishpatim": ["Mishpatim", "6adf53ea67e54b24cd0ab24b", "prod_VVps7RoFi3Ewdy"],
+  "terumah": ["Terumah", "6adf53ed74bd2435cf0d84e9", "prod_VVpsWNT73OO1vB"],
+  "tetzaveh": ["Tetzaveh", "6adf53f010aa455cb00a0162", "prod_VVpsFgVZUAeN8K"],
+  "ki-tisa": ["Ki Tisa", "6adf53f33cbbbda20400c081", "prod_VVps9UcoWsUs86"],
+  "vayakhel": ["Vayakhel", "6adf53f7e1f425fa1d093829", "prod_VVpsVBPpvUGhRJ"],
+  "pekudei": ["Pekudei", "6adf53fb0e1032396903d13e", "prod_VVpsqH5DTDL9nA"],
+  "vayikra": ["Vayikra", "6adf53fe7f77422b2b0b0962", "prod_VVpsBcM0gTwUxK"],
+  "tzav": ["Tzav", "6adf54023a852e6fa20e57c4", "prod_VVpsPX2Paf2irU"],
+  "shmini": ["Shmini", "6adf5406c60cddcb0600f1b8", "prod_VVpsX2nmlHai4M"],
+  "tazria": ["Tazria", "6adf5409c60cddcb0600f1b9", "prod_VVpsGVo1FW0gAF"],
+  "metzora": ["Metzora", "6adf540d250930614e0f2639", "prod_VVpsHJsii7PsIM"],
+  "acharei-mot": ["Acharei Mot", "6adf541074bd2435cf0d850d", "prod_VVpsTWJphTXfSn"],
+  "kedoshim": ["Kedoshim", "6adf54143cbbbda20400c095", "prod_VVpsHdYQ8cXSVL"],
+  "emor": ["Emor", "6adf541874bd2435cf0d8513", "prod_VVpsGUPR2Cz0jO"],
+  "behar": ["Behar", "6adf541b74bd2435cf0d8515", "prod_VVpsQqLRNOeOAv"],
+  "bechukotai": ["Bechukotai", "6adf541f67e54b24cd0ab26c", "prod_VVpsBXiXGWkjxf"],
+  "bamidbar": ["Bamidbar", "6adf542374bd2435cf0d8518", "prod_VVps0zh4Zmt4v1"],
+  "nasso": ["Nasso", "6adf54273a852e6fa20e57d7", "prod_VVpsH95OxraYNA"],
+  "behaalotecha": ["Behaalotecha", "6adf542a74bd2435cf0d851f", "prod_VVpsl5ZQbt7X7h"],
+  "shlach": ["Shlach", "6adf542d250930614e0f2653", "prod_VVps7wwEIIIOrl"],
+  "korach": ["Korach", "6adf543074bd2435cf0d8520", "prod_VVpsBED1ZK08M2"],
+  "chukat": ["Chukat", "6adf5434250930614e0f265a", "prod_VVpsHACZXez59K"],
+  "balak": ["Balak", "6adf5438250930614e0f265d", "prod_VVpsQRMANCpbz2"],
+  "pinchas": ["Pinchas", "6adf543b3cbbbda20400c0ad", "prod_VVps7IXNJoSdT8"],
+  "matot": ["Matot", "6adf543e9d15ca1a990f5698", "prod_VVpsslOfiowuVl"],
+  "masei": ["Masei", "6adf54427f77422b2b0b0990", "prod_VVpsfcDDGwK6tC"],
+  "devarim": ["Devarim", "6adf544610aa455cb00a0196", "prod_VVpsagfVY1hx8e"],
+  "vaetchanan": ["Vaetchanan", "6adf54497f77422b2b0b099e", "prod_VVps9oNkVpnkwI"],
+  "eikev": ["Eikev", "6adf544c250930614e0f2674", "prod_VVpst5l5f6g1C8"],
+  "reeh": ["Re'eh", "6adf545010aa455cb00a01a1", "prod_VVpsmTqbAdiMD6"],
+  "shoftim": ["Shoftim", "6adf5454250930614e0f2677", "prod_VVpsJM2wgaIufJ"],
+  "ki-teitzei": ["Ki Teitzei", "6adf545867e54b24cd0ab2aa", "prod_VVpsPnh4K12ARS"],
+  "ki-tavo": ["Ki Tavo", "6adf545c74bd2435cf0d8546", "prod_VVpsuBu4Zq6rXL"],
+  "nitzavim": ["Nitzavim", "6adf545f10aa455cb00a01a8", "prod_VVpscxSM2s1CCO"],
+  "vayeilech": ["Vayeilech", "6adf546274bd2435cf0d854c", "prod_VVptFvvmrQSiF4"],
+  "haazinu": ["Ha'azinu", "6adf54663a852e6fa20e57f7", "prod_VVpt1JUgx94CUB"],
+  "vezot-haberacha": ["V'Zot HaBerachah", "6adf54693a852e6fa20e57fb", "prod_VVptYvDXUd5qTA"],
 };
 // Names used when the art is micrography (scripture.html / The Scribe style)
 const SCRIPTURE_NAMES: Record<string, string> = {
@@ -146,18 +206,26 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const { style, product, art_url, preview_url, email, session_key, utm, photo } = body;
+  const { product, email, session_key, utm, photo } = body;
   const digital = body.digital === true;
   const artStyle = typeof body.art_style === "string" && /^[a-z]{1,20}$/.test(body.art_style)
     ? body.art_style
     : "renaissance";
   const aboutText = typeof body.about === "string" ? body.about.trim().slice(0, 500) : null;
   if (!PRICES[product]) return json({ error: "Unknown product" }, 400);
-  if (!validUrl(art_url)) {
+  const tie = product === "tie" && Object.hasOwn(TIES, String(body.variant)) ? TIES[String(body.variant)] : null;
+  if (product === "tie") {
+    if (!tie) return json({ error: "Unknown parsha" }, 400);
+    // The art is fixed per parsha, so never trust a client-supplied URL for it.
+    body.art_url = body.preview_url = `${SITE}/parsha-ties/img/${body.variant}-flat.webp`;
+  }
+  if (!validUrl(body.art_url)) {
     return json({ error: "Missing or invalid art_url - render a preview first" }, 400);
   }
   const isMg = product in MG_VARIANTS;
-  const variant = isMg && MG_VARIANTS[product].includes(body.variant) ? String(body.variant) : null;
+  const art_url: string = body.art_url, preview_url = body.preview_url;
+  const style = tie ? `Parshat ${tie[0]} tie` : body.style;
+  const variant = isMg && MG_VARIANTS[product].includes(body.variant) ? String(body.variant) : tie ? String(body.variant) : null;
   const draftId = typeof body.draft_id === "string" && UUID.test(body.draft_id) ? body.draft_id : null;
   if (isMg) {
     // The print file must be art we stored (dg-render / dg-mg-draft), not an arbitrary URL.
@@ -215,7 +283,7 @@ Deno.serve(async (req: Request) => {
   const p = new URLSearchParams();
   p.set("mode", "payment");
   p.set("client_reference_id", order.id);
-  const returnPage = isMg && draftId ? `/scripture.html?d=${draftId}&` : "/?";
+  const returnPage = tie ? `/parsha-ties/?` : isMg && draftId ? `/scripture.html?d=${draftId}&` : "/?";
   const productName = (artStyle === "micrography" || String(style ?? "").startsWith("Scripture")) && SCRIPTURE_NAMES[product]
     ? SCRIPTURE_NAMES[product]
     : PRICES[product].name;
@@ -227,11 +295,15 @@ Deno.serve(async (req: Request) => {
   p.set("line_items[0][quantity]", "1");
   p.set("line_items[0][price_data][currency]", "usd");
   p.set("line_items[0][price_data][unit_amount]", String(PRICES[product].cents));
-  p.set(
-    "line_items[0][price_data][product_data][name]",
-    productName + " — " + String(style ?? "Custom"),
-  );
-  p.set("line_items[0][price_data][product_data][images][0]", displayImage);
+  if (tie) {
+    p.set("line_items[0][price_data][product]", tie[2]);
+  } else {
+    p.set(
+      "line_items[0][price_data][product_data][name]",
+      productName + " — " + String(style ?? "Custom"),
+    );
+    p.set("line_items[0][price_data][product_data][images][0]", displayImage);
+  }
   if (digital) {
     p.set("line_items[1][quantity]", "1");
     p.set("line_items[1][price_data][currency]", "usd");
@@ -248,9 +320,9 @@ Deno.serve(async (req: Request) => {
   p.set("shipping_address_collection[allowed_countries][0]", "US");
   // TGC's Address API requires phone_number; Stripe doesn't collect it by default.
   p.set("phone_number_collection[enabled]", "true");
-  p.set("shipping_options[0][shipping_rate_data][display_name]", "Standard shipping");
+  p.set("shipping_options[0][shipping_rate_data][display_name]", tie ? "Free US shipping" : "Standard shipping");
   p.set("shipping_options[0][shipping_rate_data][type]", "fixed_amount");
-  p.set("shipping_options[0][shipping_rate_data][fixed_amount][amount]", String(SHIPPING_CENTS));
+  p.set("shipping_options[0][shipping_rate_data][fixed_amount][amount]", String(tie ? 0 : SHIPPING_CENTS));
   p.set("shipping_options[0][shipping_rate_data][fixed_amount][currency]", "usd");
   p.set("metadata[order_id]", order.id);
   p.set("metadata[product]", product);
@@ -258,6 +330,7 @@ Deno.serve(async (req: Request) => {
   p.set("metadata[art_style]", artStyle);
   p.set("metadata[art_url]", art_url);
   if (variant) p.set("metadata[variant]", variant);
+  if (tie) p.set("metadata[printify_product_id]", tie[1]);
   if (digital) p.set("metadata[digital]", "1");
   if (validUrl(preview_url)) p.set("metadata[preview_url]", preview_url);
   if (typeof session_key === "string" && session_key.length <= 64) {

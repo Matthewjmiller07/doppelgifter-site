@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
 <title>Parsha Ties — DoppelGifter</title>
 <meta name="description" content="Fifty-four neckties, one for every weekly Torah portion. From Bereishit to V'Zot HaBerachah.">
 <style>
@@ -125,7 +124,12 @@
   .specs li { padding: 8px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; }
   .specs li b { color: var(--ink); font-weight: 600; text-align: right; }
   .buy { background: var(--seal); color: #fff; border: none; border-radius: 8px; font: inherit; font-weight: 650; font-size: 17px;
-    min-height: 52px; padding: 14px 24px; cursor: not-allowed; opacity: .55; }
+    min-height: 52px; padding: 14px 24px; cursor: pointer; }
+  .buy:disabled { cursor: wait; opacity: .6; }
+  .buy:hover:not(:disabled) { filter: brightness(1.06); }
+  .done { max-width: 760px; margin: 18px auto 0; padding: 14px 18px; border-radius: 12px; text-align: center;
+    background: var(--ground-raise); border: 2px solid var(--gilt); font-size: 15px; }
+  .done b { color: var(--gilt); }
   .note { font-size: 13px; color: var(--ink-soft); margin: 0; text-align: center; }
   .close { position: absolute; top: 10px; right: 10px; width: 40px; height: 40px; border-radius: 999px; border: none;
     background: var(--ground-raise); color: var(--ink); font-size: 22px; cursor: pointer; box-shadow: var(--shadow); z-index: 2; }
@@ -152,6 +156,7 @@
   <div class="promo"><span class="heb">י</span><div><b>Use code <code>YUD</code> for 10% off.</b> Yud is worth 10 in gematria, so it's worth 10% here. That takes a tie from $33.32 to $29.99. It's ma'aser in reverse: this time you keep the tenth.</div></div>
 </header>
 
+<div class="done" id="done" hidden><b>Mazal tov, it's ordered.</b> A confirmation email is on its way, and your tie goes to the printer today.</div>
 <div class="thisweek" id="thisweek"></div>
 
 <nav class="books" aria-label="Find a parsha"><div class="inner">
@@ -161,7 +166,7 @@
 
 <main id="list"></main>
 
-<footer>DoppelGifter · Parsha Ties · Preview collection</footer>
+<footer>DoppelGifter · Parsha Ties · Questions? <a href="mailto:hello@doppelgifter.com">hello@doppelgifter.com</a></footer>
 
 <dialog id="dlg" aria-labelledby="d-name">
   <button class="close" aria-label="Close" onclick="dlg.close()">×</button>
@@ -188,14 +193,16 @@
         <li>Details <b>Keeper loop · V-shaped end</b></li>
         <li>Made <b>Printed to order</b></li>
       </ul>
-      <button class="buy" disabled>Checkout opening soon</button>
-      <p class="note">Preview collection. Orders aren't open yet.</p>
+      <button class="buy" id="d-buy">Buy this tie</button>
+      <p class="note" id="d-note">Secure checkout with Stripe. Printed to order and shipped free in the US.</p>
     </div>
   </div>
 </dialog>
 
 <script>
 const TIES = [{"slug": "bereishit", "name": "Bereishit", "heb": "בראשית", "book": "Genesis", "blurb": "Seven days, one tie. Light, land, stars and every creeping thing.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "noach", "name": "Noach", "heb": "נח", "book": "Genesis", "blurb": "Two of every animal, one of every tie.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "lech-lecha", "name": "Lech Lecha", "heb": "לך לך", "book": "Genesis", "blurb": "Go forth — and count the stars on the way.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "vayera", "name": "Vayera", "heb": "וירא", "book": "Genesis", "blurb": "For the host with the most open tent.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "chayei-sarah", "name": "Chayei Sarah", "heb": "חיי שרה", "book": "Genesis", "blurb": "Kindness at the well, camels and all.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "toldot", "name": "Toldot", "heb": "תולדות", "book": "Genesis", "blurb": "Worth more than a bowl of lentil stew.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "vayetzei", "name": "Vayetzei", "heb": "ויצא", "book": "Genesis", "blurb": "Angels going up, angels coming down.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "vayishlach", "name": "Vayishlach", "heb": "וישלח", "book": "Genesis", "blurb": "Wrestled till dawn, walked away blessed.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "vayeshev", "name": "Vayeshev", "heb": "וישב", "book": "Genesis", "blurb": "The original coat of many colors — now a tie.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "miketz", "name": "Miketz", "heb": "מקץ", "book": "Genesis", "blurb": "Seven fat cows, seven good years.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "vayigash", "name": "Vayigash", "heb": "ויגש", "book": "Genesis", "blurb": "For the family reunion of the season.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "vayechi", "name": "Vayechi", "heb": "ויחי", "book": "Genesis", "blurb": "Twelve tribes, twelve blessings, one knot.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "shemot", "name": "Shemot", "heb": "שמות", "book": "Exodus", "blurb": "Burning, but not consumed.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "vaera", "name": "Vaera", "heb": "וארא", "book": "Exodus", "blurb": "Frogs on the right, frogs on the left.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "bo", "name": "Bo", "heb": "בא", "book": "Exodus", "blurb": "Matzah, locusts, and an exit.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "beshalach", "name": "Beshalach", "heb": "בשלח", "book": "Exodus", "blurb": "Split the sea, dance with tambourines.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "yitro", "name": "Yitro", "heb": "יתרו", "book": "Exodus", "blurb": "Thunder, lightning, and Ten Commandments.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "mishpatim", "name": "Mishpatim", "heb": "משפטים", "book": "Exodus", "blurb": "Law and order, Sinai edition.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "terumah", "name": "Terumah", "heb": "תרומה", "book": "Exodus", "blurb": "Build Me a sanctuary — start with a sharp tie.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "tetzaveh", "name": "Tetzaveh", "heb": "תצוה", "book": "Exodus", "blurb": "Breastplate jewels and golden bells.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "ki-tisa", "name": "Ki Tisa", "heb": "כי תשא", "book": "Exodus", "blurb": "Half a shekel each — everybody counts.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "vayakhel", "name": "Vayakhel", "heb": "ויקהל", "book": "Exodus", "blurb": "Gather, build, rest on Shabbat.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "pekudei", "name": "Pekudei", "heb": "פקודי", "book": "Exodus", "blurb": "Every silver socket accounted for.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "vayikra", "name": "Vayikra", "heb": "ויקרא", "book": "Leviticus", "blurb": "Season everything with salt.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "tzav", "name": "Tzav", "heb": "צו", "book": "Leviticus", "blurb": "A fire that never goes out.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "shmini", "name": "Shmini", "heb": "שמיני", "book": "Leviticus", "blurb": "Split hooves, fins and scales.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "tazria", "name": "Tazria", "heb": "תזריע", "book": "Leviticus", "blurb": "For the new parents in shul.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "metzora", "name": "Metzora", "heb": "מצורע", "book": "Leviticus", "blurb": "Cedar, hyssop and a scarlet thread.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "acharei-mot", "name": "Acharei Mot", "heb": "אחרי מות", "book": "Leviticus", "blurb": "Two goats walked into the desert…", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "kedoshim", "name": "Kedoshim", "heb": "קדושים", "book": "Leviticus", "blurb": "Love your neighbor — and their tie.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "emor", "name": "Emor", "heb": "אמור", "book": "Leviticus", "blurb": "Every holiday on one tie.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "behar", "name": "Behar", "heb": "בהר", "book": "Leviticus", "blurb": "Let the land rest. Let the tie work.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "bechukotai", "name": "Bechukotai", "heb": "בחוקותי", "book": "Leviticus", "blurb": "If you walk in My ways… rain in its season.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "bamidbar", "name": "Bamidbar", "heb": "במדבר", "book": "Numbers", "blurb": "Every tribe under its own banner.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "nasso", "name": "Nasso", "heb": "נשא", "book": "Numbers", "blurb": "May you be blessed — and well dressed.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "behaalotecha", "name": "Behaalotecha", "heb": "בהעלותך", "book": "Numbers", "blurb": "Light the lamps, sound the trumpets.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "shlach", "name": "Shlach", "heb": "שלח", "book": "Numbers", "blurb": "The grapes were THIS big.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "korach", "name": "Korach", "heb": "קרח", "book": "Numbers", "blurb": "The staff that blossomed almonds.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "chukat", "name": "Chukat", "heb": "חקת", "book": "Numbers", "blurb": "Speak to the rock (don't hit it).", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "balak", "name": "Balak", "heb": "בלק", "book": "Numbers", "blurb": "How goodly are your tents.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "pinchas", "name": "Pinchas", "heb": "פינחס", "book": "Numbers", "blurb": "A covenant of peace — and a great tie.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "matot", "name": "Matot", "heb": "מטות", "book": "Numbers", "blurb": "Keep your word, keep your tie.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "masei", "name": "Masei", "heb": "מסעי", "book": "Numbers", "blurb": "Forty-two stops. One destination.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "devarim", "name": "Devarim", "heb": "דברים", "book": "Deuteronomy", "blurb": "The speech of a lifetime.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "vaetchanan", "name": "Vaetchanan", "heb": "ואתחנן", "book": "Deuteronomy", "blurb": "Hear, O Israel. Look sharp, O Israel.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "eikev", "name": "Eikev", "heb": "עקב", "book": "Deuteronomy", "blurb": "The seven species, woven in silk.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "reeh", "name": "Re'eh", "heb": "ראה", "book": "Deuteronomy", "blurb": "See, I set before you a blessing.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "shoftim", "name": "Shoftim", "heb": "שופטים", "book": "Deuteronomy", "blurb": "Justice, justice — and a good knot.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "ki-teitzei", "name": "Ki Teitzei", "heb": "כי תצא", "book": "Deuteronomy", "blurb": "Seventy-four mitzvot. One tie.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "ki-tavo", "name": "Ki Tavo", "heb": "כי תבוא", "book": "Deuteronomy", "blurb": "First fruits, best foot forward.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "nitzavim", "name": "Nitzavim", "heb": "נצבים", "book": "Deuteronomy", "blurb": "Not in heaven. Right here, around your neck.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "vayeilech", "name": "Vayeilech", "heb": "וילך", "book": "Deuteronomy", "blurb": "Write this song for yourselves.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "haazinu", "name": "Ha'azinu", "heb": "האזינו", "book": "Deuteronomy", "blurb": "Listen, heavens — he's wearing the eagle tie.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}, {"slug": "vezot-haberacha", "name": "V'Zot HaBerachah", "heb": "וזאת הברכה", "book": "Deuteronomy", "blurb": "For Simchat Torah dancing.", "price": 3332, "views": ["flat", "worn", "detail", "boxed"]}];
+const API = "https://knbyyykfwwlgnizutqyb.supabase.co";
+const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuYnl5eWtmd3dsZ25penV0cXliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4MjI3MDMsImV4cCI6MjA5NjM5ODcwM30.xbArp2d_jbD28dqg5ZdjgmaqKJ6erbTtVzMv22TDsxg";
 const BOOKS = [["Genesis","בראשית"],["Exodus","שמות"],["Leviticus","ויקרא"],["Numbers","במדבר"],["Deuteronomy","דברים"]];
 const LABELS = { flat: "Flat", worn: "Worn", detail: "Detail", boxed: "Boxed" };
 const money = c => "$" + (c / 100).toFixed(2);
@@ -256,12 +263,29 @@ function open(slug) {
   document.getElementById("d-blurb").textContent = t.blurb;
   const price = document.getElementById("d-price"), msg = document.getElementById("d-codemsg"), form = document.getElementById("d-code");
   price.textContent = money(t.price); msg.textContent = ""; form.reset();
+  let promo = null;
+  const buy = document.getElementById("d-buy"), note = document.getElementById("d-note");
+  buy.disabled = false; buy.textContent = "Buy this tie";
+  buy.onclick = () => {
+    buy.disabled = true; buy.textContent = "Opening checkout…";
+    fetch(API + "/functions/v1/dg-checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + ANON },
+      body: JSON.stringify({ product: "tie", variant: t.slug, promo, utm: "parsha-ties" }),
+    }).then(r => r.json()).then(d => {
+      if (d.url) { location.href = d.url; return; }
+      throw new Error(d.error || "Checkout failed");
+    }).catch(e => {
+      buy.disabled = false; buy.textContent = "Buy this tie";
+      note.textContent = "Checkout didn't open (" + e.message + "). Try again, or email hello@doppelgifter.com.";
+    });
+  };
   form.onsubmit = e => {
     e.preventDefault();
     if (form.code.value.trim().toUpperCase() === "YUD") {
       price.innerHTML = `${money(Math.round(t.price * 0.9))} <s style="font-size:16px;font-weight:400;color:var(--ink-soft)">${money(t.price)}</s>`;
-      msg.textContent = "Yud = 10, so 10% off. Applied.";
-    } else { price.textContent = money(t.price); msg.textContent = "Not a code. Try the tenth letter."; }
+      msg.textContent = "Yud = 10, so 10% off. Applied."; promo = "YUD";
+    } else { price.textContent = money(t.price); msg.textContent = "Not a code. Try the tenth letter."; promo = null; }
   };
   const main = document.getElementById("d-main");
   const show = v => {
@@ -299,6 +323,7 @@ fetch("https://www.hebcal.com/shabbat?cfg=json&geo=none&M=off&leyning=off")
     renderChips(); renderList();
   }).catch(() => {});
 renderChips(); renderList();
+if (new URLSearchParams(location.search).get("order") === "success") document.getElementById("done").hidden = false;
 if (location.hash && TIES.some(t => t.slug === location.hash.slice(1))) open(location.hash.slice(1));
 </script>
 </body>

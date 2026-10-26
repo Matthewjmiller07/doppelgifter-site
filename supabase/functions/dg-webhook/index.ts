@@ -18,6 +18,7 @@ const PRODUCT_NAMES: Record<string, string> = {
   mg_print: "The Collector's Print",
   mg_framed: "The Gallery Frame",
   mg_case: "The Pocket Shrine",
+  tie: "Parsha Tie",
 };
 const SCRIPTURE_NAMES: Record<string, string> = {
   mg_print: "The Scribe's Print",
@@ -34,6 +35,7 @@ const PRODUCT_QUIPS: Record<string, string> = {
   mg_print: "their likeness is being pressed onto 12×16 inches of fine-art paper, ready for a frame and a smug little plaque",
   mg_framed: "their likeness is being printed, matted, and sealed behind glass like the national treasure they believe they are",
   mg_case: "their face is being fused onto a tough phone case, so every pocket-dial is now a personal appearance",
+  tie: "the parsha is being dye-sublimated onto a necktie, motif by motif, in time for a very well-dressed kiddush",
 };
 const SCRIPTURE_QUIPS: Record<string, string> = {
   mg_print: "several thousand very small letters are being pressed onto fine-art paper, each one exactly where the scribe left it",
@@ -147,6 +149,59 @@ async function startPrintifyGoods(supabase: any, orderId: string, s: any) {
       `A paid ${product} order could not be placed with Printify.\n\nOrder: ${orderId}\n\n${msg}`);
   }
 }
+// Parsha Ties: the 54 Printify products already exist (dg-checkout puts the id in metadata),
+// so a paid order just orders that product and sends it to production.
+const TIE_VARIANT = 63353; // Printify necktie, one size
+async function startTieOrder(supabase: any, orderId: string, s: any) {
+  const productId = s.metadata?.printify_product_id;
+  try {
+    if (!productId) throw new Error("no printify_product_id on tie order");
+    const { data: pkey } = await supabase.rpc("dg_get_secret", { secret_name: "PRINTIFY_API_KEY" });
+    const H = {
+      Authorization: `Bearer ${pkey}`,
+      "Content-Type": "application/json",
+      "User-Agent": "DoppelGifter/0.1 (+https://doppelgifter.com)",
+    };
+    const shipping = s.collected_information?.shipping_details ?? s.shipping_details ?? null;
+    const addr = shipping?.address ?? s.customer_details?.address ?? {};
+    const nameParts = String(shipping?.name ?? s.customer_details?.name ?? "DoppelGifter Customer").split(" ");
+    const order = await (await fetch(`https://api.printify.com/v1/shops/${PRINTIFY.shop}/orders.json`, {
+      method: "POST", headers: H,
+      body: JSON.stringify({
+        external_id: orderId,
+        label: `dg-tie-${orderId.slice(0, 8)}`,
+        line_items: [{ product_id: productId, variant_id: TIE_VARIANT, quantity: 1 }],
+        shipping_method: 1,
+        send_shipping_notification: true,
+        address_to: {
+          first_name: nameParts[0],
+          last_name: nameParts.slice(1).join(" ") || "-",
+          email: s.customer_details?.email ?? "",
+          phone: s.customer_details?.phone ?? "",
+          country: addr.country ?? "US",
+          region: addr.state ?? "",
+          address1: addr.line1 ?? "",
+          address2: addr.line2 ?? "",
+          city: addr.city ?? "",
+          zip: addr.postal_code ?? "",
+        },
+      }),
+    })).json();
+    if (!order?.id) throw new Error("printify order failed: " + JSON.stringify(order).slice(0, 200));
+    await fetch(`https://api.printify.com/v1/shops/${PRINTIFY.shop}/orders/${order.id}/send_to_production.json`, {
+      method: "POST", headers: H,
+    });
+    await supabase.from("dg_orders").update({
+      status: "submitted", printify_product_id: String(productId), printify_order_id: String(order.id),
+    }).eq("id", orderId);
+  } catch (e) {
+    const msg = String((e as Error)?.message ?? e);
+    console.error("tie order failed", orderId, msg);
+    await supabase.from("dg_orders").update({ status: "failed" }).eq("id", orderId);
+    await alertOwner(supabase, `⚠️ Parsha Tie order failed — ${orderId.slice(0, 8)}`,
+      `A paid tie order (${s.metadata?.variant}) could not be placed with Printify.\n\nOrder: ${orderId}\n\n${msg}`);
+  }
+}
 const MG_PRODUCTS = new Set(["mg_print", "mg_framed", "mg_case"]);
 
 // Hands a paid micrography order to dg-prodigi-order (Prodigi fulfillment). Separate
@@ -249,6 +304,8 @@ async function sendConfirmationEmail(supabase: any, s: any, orderId: string) {
         to: [{ email: to }],
         subject: scripture
           ? `It is done. ${productName} is being inscribed. 📜`
+          : product === "tie"
+          ? `It is done. Your ${s.metadata?.style || productName} is being printed. 👔`
           : `It is done. ${productName} bearing their face is being forged. 🏺`,
         htmlContent: html,
       }),
@@ -547,6 +604,14 @@ Deno.serve(async (req: Request) => {
 
   if (s.metadata?.product !== "mug") {
     await sendConfirmationEmail(supabase, s, orderId);
+
+    if (s.metadata?.product === "tie") {
+      const bg = startTieOrder(supabase, orderId, s);
+      const rt = (globalThis as any).EdgeRuntime;
+      if (rt?.waitUntil) rt.waitUntil(bg);
+      else await bg;
+      return new Response("paid; tie sent to Printify", { status: 200 });
+    }
 
     if (MG_PRODUCTS.has(s.metadata?.product)) {
       // Hybrid: the matted frame is Prodigi's; prints and cases are Printify's.
